@@ -74,7 +74,7 @@ loki.process "adguard_parse" {
 
   stage.template {
     source   = "output"
-    template = "{{ .client_name }} ({{ .client }}) -> {{ .domain }} [{{ .query_type }}] cat={{ .category }} reason={{ .reason }} upstream={{ .upstream }}"
+    template = "{{ .client_name }} → {{ .domain }} [{{ .query_type }}]{{ if and .reason (ge (.reason | int) 3) }} — BLOCKED{{ else if and .upstream (ne .upstream \"<no value>\") }} via {{ .upstream }}{{ end }}"
   }
 
   stage.output {

@@ -298,26 +298,34 @@
 
     {
       "id": 8,
-      "title": "School / Productivity Activity  (low activity here = no studying)",
-      "description": "DNS queries matching known educational platforms. Low activity during study time is a useful contrast against gaming activity above.",
-      "type": "timeseries",
+      "title": "School / Productivity Activity  (24h)",
+      "description": "DNS queries to known educational platforms in the past 24 hours. A low or zero count during study hours is worth noting alongside any gaming activity above.",
+      "type": "stat",
       "gridPos": { "x": 0, "y": 41, "w": 24, "h": 6 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "options": {
-        "tooltip": { "mode": "multi" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "reduceOptions": { "calcs": ["sum"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 1, "fillOpacity": 10 },
-          "color": { "mode": "fixed", "fixedColor": "blue" }
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "blue",  "value": 1 }
+            ]
+          }
         }
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"classroom[.]google|docs[.]google|drive[.]google|forms[.]google|office[.]com|sharepoint[.]com|onenote[.]com|schoology|khanacademy|duolingo\" [5m]))",
-          "legendFormat": "📚 {{client_name}}",
-          "queryType": "range",
+          "expr": "sum(count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"classroom[.]google|docs[.]google|drive[.]google|forms[.]google|office[.]com|sharepoint[.]com|onenote[.]com|schoology|khanacademy|duolingo\" [24h]))",
+          "legendFormat": "",
+          "queryType": "instant",
           "refId": "A"
         }
       ]
