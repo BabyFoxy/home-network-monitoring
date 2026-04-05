@@ -1,9 +1,9 @@
-version: "3.8"
-
 # ─────────────────────────────────────────────
 # DNS Log Visualisation Stack
 # Grafana + Loki + Alloy — Synology NAS
 # ─────────────────────────────────────────────
+
+version: "3.8"
 
 networks:
   hnm-net:

@@ -2,8 +2,8 @@
   "title": "DNS — Parental Review",
   "uid": "dns-log-viz-v1",
   "schemaVersion": 39,
-  "version": 4,
-  "refresh": "60s",
+  "version": 6,
+  "refresh": "5m",
   "time": { "from": "now-24h", "to": "now" },
   "description": "DNS evidence for gaming-related activity. Matches strongly suggest gaming-related behaviour but do not prove active gameplay with certainty.",
   "templating": {
@@ -19,20 +19,6 @@
         "multi": true,
         "refresh": 2,
         "sort": 1,
-        "current": {}
-      },
-      {
-        "name": "client",
-        "label": "Device IP",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-        "query": "label_values({job=\"adguard\"}, client)",
-        "includeAll": true,
-        "allValue": ".+",
-        "multi": false,
-        "refresh": 2,
-        "sort": 1,
-        "hide": 1,
         "current": {}
       },
       {
@@ -59,27 +45,51 @@
 
     {
       "id": 1,
-      "title": "Gaming Activity Score by Device  (DNS hits — Confirmed + Web Gaming)",
-      "description": "Total gaming-category DNS queries per device in the selected time range. Higher = more activity.",
-      "type": "barchart",
+      "title": "Gaming Activity Score by Device  (24h)",
+      "description": "Gaming-related DNS queries per device in the past 24 hours. Count includes confirmed gaming and web-gaming domains. Higher = more activity.",
+      "type": "table",
       "gridPos": { "x": 0, "y": 2, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "options": {
-        "orientation": "horizontal",
-        "legend": { "displayMode": "hidden" },
-        "tooltip": { "mode": "single" },
-        "xField": "client_name"
+        "showHeader": true,
+        "footer": { "show": false },
+        "sortBy": [ { "desc": true, "displayName": "Gaming Hits (24h)" } ]
       },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "orange" },
-          "custom": { "fillOpacity": 80 }
-        }
+          "custom": { "align": "auto", "cellOptions": { "type": "color-background" } },
+          "unit": "none",
+          "displayName": "Gaming Hits (24h)"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Time" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "client_name" },
+            "properties": [
+              { "id": "displayName", "value": "Device" },
+              { "id": "custom.cellOptions", "value": { "type": "text" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "Value.*" },
+            "properties": [
+              { "id": "displayName", "value": "Gaming Hits (24h)" },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 50 }, { "color": "red", "value": 200 } ] } }
+            ]
+          }
+        ]
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", category=~\"gaming|web_gaming\"}[$__range]))",
-          "legendFormat": "{{client_name}}",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [24h]))",
+          "legendFormat": "",
           "queryType": "instant",
           "refId": "A"
         }
@@ -88,27 +98,50 @@
 
     {
       "id": 2,
-      "title": "Top Game Domains  (selected devices, selected time range)",
-      "description": "Domain extracted from log line at query time — no extra labels stored. Only gaming and web-gaming category queries appear here.",
-      "type": "barchart",
+      "title": "Top Game Domains  (24h, selected devices)",
+      "description": "Gaming-related domains queried by the selected devices in the past 24 hours. Count = number of DNS lookups per domain.",
+      "type": "table",
       "gridPos": { "x": 12, "y": 2, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "options": {
-        "orientation": "horizontal",
-        "legend": { "displayMode": "hidden" },
-        "tooltip": { "mode": "single" },
-        "xField": "domain"
+        "showHeader": true,
+        "footer": { "show": false },
+        "sortBy": [ { "desc": true, "displayName": "Hits" } ]
       },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "red" },
-          "custom": { "fillOpacity": 80 }
-        }
+          "custom": { "align": "auto", "cellOptions": { "type": "color-background" } },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Time" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "domain" },
+            "properties": [
+              { "id": "displayName", "value": "Domain" },
+              { "id": "custom.cellOptions", "value": { "type": "text" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "Value.*" },
+            "properties": [
+              { "id": "displayName", "value": "Hits" },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 10 }, { "color": "red", "value": 100 } ] } }
+            ]
+          }
+        ]
       },
       "targets": [
         {
-          "expr": "sum by (domain) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"} | regexp \"-> (?P<domain>[^ ]+)\" [$__range]))",
-          "legendFormat": "{{domain}}",
+          "expr": "sum by (domain) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" | regexp \"-> (?P<domain>[^ ]+)\" [24h]))",
+          "legendFormat": "",
           "queryType": "instant",
           "refId": "A"
         }
@@ -134,13 +167,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"}[5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
           "legendFormat": "🎮 {{client_name}}",
           "queryType": "range",
           "refId": "A"
         },
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=\"entertainment\"}[5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discordapp[.]com|discord[.]gg|twitch[.]tv\" [5m]))",
           "legendFormat": "📺 {{client_name}} (entertainment)",
           "queryType": "range",
           "refId": "B"
@@ -172,7 +205,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"}[5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
           "legendFormat": "{{client_name}}",
           "queryType": "range",
           "refId": "A"
@@ -182,8 +215,8 @@
 
     {
       "id": 5,
-      "title": "Blocked Gaming Queries",
-      "description": "Gaming-category DNS queries that AdGuard blocked (reason ≥ 3) in the selected time range.",
+      "title": "Gaming Queries Blocked  (24h)",
+      "description": "Gaming-related DNS queries that AdGuard blocked (reason >= 3) in the past 24 hours, for the selected devices.",
       "type": "stat",
       "gridPos": { "x": 16, "y": 17, "w": 8, "h": 6 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
@@ -208,8 +241,8 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\", reason=~\"[3-9]\"}[$__range]))",
-          "legendFormat": "Blocked gaming queries",
+          "expr": "sum(count_over_time({job=\"adguard\", client_name=~\"$client_name\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [24h]))",
+          "legendFormat": "",
           "queryType": "instant",
           "refId": "A"
         }
@@ -218,8 +251,8 @@
 
     {
       "id": 6,
-      "title": "Recent Gaming Evidence  (confirmed + web gaming DNS queries, newest first)",
-      "description": "Most recent gaming-related DNS lookups from selected devices. Use Domain filter above to search for a specific game. Each line = one DNS query.",
+      "title": "Blocked Gaming Evidence  (24h, newest first)",
+      "description": "Gaming-related DNS queries blocked by AdGuard (reason >= 3) in the past 24 hours. Each row = one blocked DNS lookup. Use Domain filter to search for a specific game or domain.",
       "type": "logs",
       "gridPos": { "x": 0, "y": 23, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
@@ -233,7 +266,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"} |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -256,7 +289,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\", category=\"entertainment\"} |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discordapp[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -266,7 +299,7 @@
     {
       "id": 8,
       "title": "School / Productivity Activity  (low activity here = no studying)",
-      "description": "DNS queries matching known educational platforms (Google Classroom, Docs, Khan Academy, Schoology, etc.). Low activity here during study time is a useful contrast against gaming activity above.",
+      "description": "DNS queries matching known educational platforms. Low activity during study time is a useful contrast against gaming activity above.",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 41, "w": 24, "h": 6 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
@@ -282,7 +315,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=\"school\"}[5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"classroom[.]google|docs[.]google|drive[.]google|forms[.]google|office[.]com|sharepoint[.]com|onenote[.]com|schoology|khanacademy|duolingo\" [5m]))",
           "legendFormat": "📚 {{client_name}}",
           "queryType": "range",
           "refId": "A"
