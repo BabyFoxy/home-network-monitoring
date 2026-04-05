@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home network gaming report — ${report_date}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #222; font-size: 14px; max-width: 800px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 20px; font-weight: 600; color: #111; margin-bottom: 4px; }
+  h2 { font-size: 15px; font-weight: 600; color: #333; margin-top: 28px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  .meta { color: #888; font-size: 13px; margin-bottom: 24px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 2fr; gap: 12px; margin-bottom: 24px; }
+  .stat-box { background: #f5f5f5; border-radius: 8px; padding: 12px 16px; }
+  .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: #222; }
+  .stat-sub { font-size: 12px; color: #555; margin-top: 2px; line-height: 1.4; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { text-align: left; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 2px solid #eee; }
+  td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; font-size: 13px; }
+  tr:hover td { background: #fafafa; }
+  .blocked { color: #c00; font-weight: 600; }
+  .allowed { color: #060; font-weight: 600; }
+  .inactive td { color: #aaa; }
+  .conclusion { background: #f9f9f9; border-left: 3px solid #666; padding: 12px 16px; margin: 16px 0; line-height: 1.7; }
+  .notes { background: #fffbf0; border: 1px solid #f0e0b0; border-radius: 6px; padding: 12px 16px; margin-top: 24px; font-size: 13px; line-height: 1.7; }
+  .notes li { margin-bottom: 4px; }
+  .no-activity { color: #aaa; font-style: italic; text-align: center; padding: 16px; }
+  .inactive-note td { font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+<h1>Home network gaming report</h1>
+<div class="meta">${report_date} &nbsp;&middot;&nbsp; Based on DNS evidence from the past 24 hours</div>
+
+<h2>Summary</h2>
+<div class="summary-grid">
+  <div class="stat-box">
+    <div class="stat-label">Devices with activity</div>
+    <div class="stat-value">${active_device_count}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Gaming DNS hits</div>
+    <div class="stat-value">${total_hits}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Blocked gaming hits</div>
+    <div class="stat-value">${total_blocked}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Top gaming domains</div>
+    <div class="stat-sub">${top_domains_summary}</div>
+  </div>
+</div>
+
+<h2>Per device</h2>
+<table>
+<thead>
+  <tr>
+    <th>Device</th>
+    <th>Gaming hits</th>
+    <th>Blocked</th>
+    <th>Top domains</th>
+    <th>Entertainment</th>
+    <th>Note</th>
+  </tr>
+</thead>
+<tbody>
+${device_rows_html}
+</tbody>
+</table>
+
+<h2>Recent blocked gaming evidence</h2>
+<table>
+<thead>
+  <tr><th>Time</th><th>Device</th><th>Domain</th><th>Query type</th><th>Status</th></tr>
+</thead>
+<tbody>
+${evidence_rows_html}
+</tbody>
+</table>
+
+<h2>Recent entertainment context</h2>
+<table>
+<thead>
+  <tr><th>Time</th><th>Device</th><th>Domain</th><th>Query type</th><th>Status</th></tr>
+</thead>
+<tbody>
+${ent_rows_html}
+</tbody>
+</table>
+
+<h2>Conclusion</h2>
+<div class="conclusion">${conclusion}</div>
+
+<div class="notes">
+  <strong>Notes</strong>
+  <ul>
+    <li>This report is based on DNS and network activity evidence.</li>
+    <li>It can strongly suggest gaming-related behaviour, but it is not proof of exact gameplay duration.</li>
+    <li>Repeated hits to Roblox, bloxd.io, and similar domains — especially with consistent timing — are stronger indicators than isolated single requests.</li>
+    <li>Blocked gaming DNS requests indicate that parental controls are working as configured.</li>
+  </ul>
+</div>
+</body>
+</html>
