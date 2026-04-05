@@ -4,51 +4,39 @@ loki.write "default" {
   }
 }
 
+// ── AdGuard Home DNS query log ──────────────────────────────
+
 local.file_match "adguard_querylog" {
-  path_targets = [{
-    __path__ = "/adguard-logs/querylog.json",
-  }]
-  sync_period = "5s"
+  path_targets = [{ __path__ = "/adguard-logs/querylog.json" }]
+  sync_period  = "5s"
 }
 
 loki.source.file "adguard_file" {
-  targets    = local.file_match.adguard_querylog.targets
-  forward_to = [loki.process.adguard_parse.receiver]
+  targets               = local.file_match.adguard_querylog.targets
+  forward_to            = [loki.process.adguard_parse.receiver]
+  legacy_positions_file = "/tmp/alloy-positions.yaml"
 }
 
 loki.process "adguard_parse" {
   forward_to = [loki.write.default.receiver]
 
-  // Extract top-level fields
   stage.json {
     expressions = {
-      client      = "client",
-      status      = "status",
-      reason      = "reason",
-      disallowed  = "disallowed",
-      upstream    = "upstream",
-      cached      = "cached",
-      event_time  = "time",
-      client_info = "client_info",
-      question    = "question",
+      event_time = "T",
+      domain     = "QH",
+      query_type = "QT",
+      client     = "IP",
+      upstream   = "Upstream",
     }
   }
 
-  // Extract client_name from client_info object
-  stage.json {
-    source      = "client_info"
-    expressions = {
-      client_name = "name",
-    }
+  stage.regex {
+    expression = `"Reason":(?P<reason>\d+)`
   }
 
-  // Extract domain and query_type from question object
-  stage.json {
-    source      = "question"
-    expressions = {
-      domain     = "name",
-      query_type = "type",
-    }
+  stage.template {
+    source   = "client_name"
+    template = `{{ $m := dict "192.168.1.1" "UDM-SE" "192.168.1.2" "Home Assistant" "192.168.1.3" "Fox Devices" "192.168.1.5" "Fox NAS" "192.168.1.6" "Fox Devices" "192.168.1.14" "Fox Devices" "192.168.1.16" "Fox Devices" "192.168.1.17" "Fox Devices" "192.168.1.18" "David iPhone" "192.168.1.19" "Apple TV" "192.168.1.26" "Elissa PC" "192.168.1.27" "Ethan PC" "192.168.1.28" "Ethan MBP" "192.168.1.101" "Fox Devices" "192.168.1.221" "Deco" "192.168.1.222" "Deco" "192.168.1.250" "Fox Devices" "192.168.1.251" "Fox Devices" }}{{ $n := get $m .client }}{{ if $n }}{{ $n }}{{ else }}{{ .client }}{{ end }}`
   }
 
   stage.timestamp {
@@ -68,13 +56,13 @@ loki.process "adguard_parse" {
       client      = "client",
       client_name = "client_name",
       query_type  = "query_type",
-      disallowed  = "disallowed",
+      reason      = "reason",
     }
   }
 
   stage.template {
     source   = "output"
-    template = "{{ .client }} ({{ .client_name }}) -> {{ .domain }} [{{ .query_type }}] status={{ .status }} reason={{ .reason }} blocked={{ .disallowed }} upstream={{ .upstream }} cached={{ .cached }}"
+    template = "{{ .client_name }} ({{ .client }}) -> {{ .domain }} [{{ .query_type }}] reason={{ .reason }} upstream={{ .upstream }}"
   }
 
   stage.output {
@@ -82,10 +70,14 @@ loki.process "adguard_parse" {
   }
 }
 
+// ── UDM SE syslog — RFC3164 BSD format ─────────────────────
+// Raw format: <priority>Mon DD HH:MM:SS hostname process: message
+
 loki.source.syslog "udm_raw" {
   listener {
     address  = "0.0.0.0:5514"
     protocol = "udp"
+    syslog_format = "rfc3164"
     labels = {
       job    = "udm",
       source = "syslog",
