@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: dns-log-viz
+    folder: DNS Log Viz
+    type: file
+    disableDeletion: false
+    editable: true
+    overwrite: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
