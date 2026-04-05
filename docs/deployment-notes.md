@@ -19,7 +19,7 @@ rsync -av /Volumes/AI_Drive/Projects/home-network-monitoring/ \
 
 Or clone the GitHub repo directly on the NAS:
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/home-network-monitoring.git \
+git clone https://github.com/BabyFoxy/home-network-monitoring.git \
   /volume1/docker/log-viz
 ```
 
