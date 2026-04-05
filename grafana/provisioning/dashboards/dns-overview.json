@@ -252,7 +252,7 @@
     {
       "id": 6,
       "title": "Blocked Gaming Evidence  (24h, newest first)",
-      "description": "Gaming-related DNS queries blocked by AdGuard (reason >= 3) in the past 24 hours. Each row = one blocked DNS lookup. Use Domain filter to search for a specific game or domain.",
+      "description": "Gaming-related DNS queries blocked by AdGuard (reason >= 3) in the past 24 hours. Each row = one blocked DNS lookup. Newer entries use a clean format; older historical entries may still appear in raw format until they age out of the retention window. Use Domain filter to search for a specific game or domain.",
       "type": "logs",
       "gridPos": { "x": 0, "y": 23, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
