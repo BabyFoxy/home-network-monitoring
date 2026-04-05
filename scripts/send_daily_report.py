@@ -20,6 +20,41 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
+# ── Timezone utilities (stdlib-only, no pytz/zoneinfo required) ────────────────
+#
+# Australia/Sydney UTC offsets:
+#   AEST (standard): UTC+10  — active ~Apr-Sep
+#   AEDT (daylight saving): UTC+11 — active ~Oct-Mar
+# We detect the current offset from the system clock so DST transitions
+# are handled automatically regardless of Python version.
+#
+# On Synology NAS the system TZ is already set to the local timezone,
+# so datetime.now() gives correct local wall-clock time.
+#
+import time as _time
+
+# Seconds east of UTC for the current system zone (negative = west of Greenwich)
+_SYSTZ_OFFSET = -_time.timezone if _time.daylight == 0 else -_time.altzone
+
+
+def _local_now():
+    """Current local datetime using the system timezone."""
+    return datetime.now()
+
+
+def _midnight_local(date_obj):
+    """Midnight (00:00) of the given date in the system timezone."""
+    return datetime.combine(date_obj, datetime.min.time())
+
+
+def _to_utc_ns(local_dt: datetime) -> int:
+    """Convert a naive local datetime to UTC nanoseconds since epoch."""
+    # local = UTC + offset_seconds
+    offset_s = _SYSTZ_OFFSET
+    utc_dt = local_dt - timedelta(seconds=offset_s)
+    return int(utc_dt.timestamp() * 1e9)
+import urllib.parse
+
 # ── Logging ────────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
@@ -109,7 +144,7 @@ class LokiClient:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 return self._strip_json_prefix(resp.read())
         except urllib.error.HTTPError as e:
             body = e.read()[:500]
@@ -117,15 +152,20 @@ class LokiClient:
         except Exception as e:
             raise RuntimeError(f"Loki request failed: {e}") from e
 
-    def query_range(self, expr: str, limit: int = 20) -> list:
-        end_ns = datetime.now(timezone.utc).timestamp() * 1e9
-        start_ns = end_ns - (8640 * 1e9)  # 24h ago
-        log.debug("Loki query_range: %s", expr[:120])
+    def query_range(self, expr: str, limit: int = 20,
+                    start_ns: int = None, end_ns: int = None) -> list:
+        now_ns = datetime.now(timezone.utc).timestamp() * 1e9
+        if start_ns is None:
+            start_ns = now_ns - (8640 * 1e9)
+        if end_ns is None:
+            end_ns = now_ns
+        log.debug("Loki query_range: %s  [%s → %s]",
+                  expr[:120], int(start_ns), int(end_ns))
         payload = urllib.parse.urlencode({
             "query": expr,
             "limit": limit,
             "start": int(start_ns),
-            "end": int(end_ns),
+            "end":   int(end_ns),
         }).encode()
         try:
             req = urllib.request.Request(
@@ -150,6 +190,27 @@ class LokiClient:
         rows.sort(key=lambda r: r[0], reverse=True)  # newest first
         return rows
 
+    def query_instant(self, expr: str, time_ns: int = None) -> dict:
+        """Instant query evaluated at an explicit UTC nanosecond timestamp."""
+        if time_ns is None:
+            time_ns = int(datetime.now(timezone.utc).timestamp() * 1e9)
+        log.debug("Loki instant query at ns=%s: %s", int(time_ns), expr[:120])
+        payload = f"query={urllib.parse.quote(expr)}&time={time_ns}".encode()
+        try:
+            req = urllib.request.Request(
+                f"{self.base}/loki/api/v1/query",
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return self._strip_json_prefix(resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read()[:500]
+            raise RuntimeError(f"Loki HTTP {e.code}: {body}") from e
+        except Exception as e:
+            raise RuntimeError(f"Loki request failed: {e}") from e
+
 
 # ── Data fetching ──────────────────────────────────────────────────────────────
 
@@ -158,9 +219,23 @@ def fetch_report_data(loki: LokiClient) -> dict:
     entertainment = ENTERTAINMENT_PATTERNS
     child_re = CHILD_DEVICES or "."
 
-    now = datetime.now(timezone.utc)
-    report_date = now.strftime("%Y-%m-%d")
-    log.info("Building report for %s", report_date)
+    # ── Timezone-aware report date and query window ──────────────────────────
+    # The report covers the previous full calendar day in the system timezone.
+    # Note: Loki 3.x does not reliably handle instant queries with `time` in the
+    # past (connection dropped). We anchor all instant queries to "now" and use
+    # [24h] as the window — acceptable for a 07:00 daily report (covers
+    # ~midnight–07:00 Sydney the previous day with minor edge-case bleed).
+    local_now = _local_now()
+    local_yesterday = local_now.date() - timedelta(days=1)
+    report_date = local_yesterday.strftime("%Y-%m-%d")
+
+    # For evidence rows (query_range), use midnight→now in UTC
+    midnight_start = _midnight_local(local_yesterday)
+    midnight_end   = _midnight_local(local_now.date())
+    query_start_ns = _to_utc_ns(midnight_start)
+    query_end_ns   = _to_utc_ns(midnight_end)  # used only for query_range
+
+    log.info("Building report for %s (previous local calendar day)", report_date)
 
     # 1. Per-device gaming hit counts
     q_device_hits = (
@@ -169,7 +244,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
         " |~ \"{gaming}\" [24h]))"
     ).format(child_re=child_re, gaming=gaming)
     try:
-        result = loki.query(q_device_hits)
+        result = loki.query_instant(q_device_hits)
         device_hits = {}
         for s in result.get("data", {}).get("result", []):
             name = s["metric"].get("client_name", "?")
@@ -185,7 +260,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
         " |~ \"{gaming}\" [24h]))"
     ).format(child_re=child_re, gaming=gaming)
     try:
-        result = loki.query(q_blocked)
+        result = loki.query_instant(q_blocked)
         device_blocked = {}
         for s in result.get("data", {}).get("result", []):
             name = s["metric"].get("client_name", "?")
@@ -194,7 +269,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
         log.error("Failed to fetch per-device blocked hits: %s", e)
         device_blocked = {}
 
-    # 3. Top gaming domains
+    # 3. Top gaming domains (all devices, 24h)
     q_domains = (
         "sum by (domain) (count_over_time("
         "{{job=\"adguard\"}}"
@@ -202,7 +277,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
         " | regexp \"-> (?P<domain>[^ ]+)\" [24h]))"
     ).format(gaming=gaming)
     try:
-        result = loki.query(q_domains)
+        result = loki.query_instant(q_domains)
         domain_counts = {}
         for s in result.get("data", {}).get("result", []):
             d = s["metric"].get("domain", "?")
@@ -226,7 +301,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
             " | regexp \"-> (?P<domain>[^ ]+)\" [24h]))"
         ).format(dev=dev, gaming=gaming)
         try:
-            result = loki.query(q)
+            result = loki.query_instant(q)
             counts = {}
             for s in result.get("data", {}).get("result", []):
                 d = s["metric"].get("domain", "?")
@@ -243,7 +318,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
         " |~ \"{gaming}\" [24h]))"
     ).format(gaming=gaming)
     try:
-        result = loki.query(q_total_blocked)
+        result = loki.query_instant(q_total_blocked)
         total_blocked = int(float(result["data"]["result"][0]["value"][1]))
     except Exception:
         total_blocked = 0
@@ -255,24 +330,27 @@ def fetch_report_data(loki: LokiClient) -> dict:
         " |~ \"{gaming}\" [24h]))"
     ).format(gaming=gaming)
     try:
-        result = loki.query(q_total)
+        result = loki.query_instant(q_total)
         total_hits = int(float(result["data"]["result"][0]["value"][1]))
     except Exception:
         total_hits = 0
 
-    # 8. Recent blocked gaming evidence
+    # 8. Recent blocked gaming evidence (within the report window)
     q_evidence = (
         "{{job=\"adguard\", reason=~\"[3-9]\"}}"
         " |~ \"{gaming}\""
         " | regexp \"-> (?P<domain>[^ ]+)\""
     ).format(gaming=gaming)
     try:
-        evidence_rows = loki.query_range(q_evidence, limit=15)
+        evidence_rows = loki.query_range(
+            q_evidence, limit=15,
+            start_ns=query_start_ns, end_ns=query_end_ns,
+        )
     except Exception as e:
         log.warning("Failed to fetch blocked evidence: %s", e)
         evidence_rows = []
 
-    # 9. Recent entertainment (active devices only)
+    # 9. Recent entertainment (active devices only, within the report window)
     if active_devices_re != "NODEVICES":
         q_ent = (
             "{{job=\"adguard\", client_name=~\"{dev_re}\"}}"
@@ -280,7 +358,10 @@ def fetch_report_data(loki: LokiClient) -> dict:
             " | regexp \"-> (?P<domain>[^ ]+)\""
         ).format(dev_re=active_devices_re, entertainment=entertainment)
         try:
-            entertainment_rows = loki.query_range(q_ent, limit=10)
+            entertainment_rows = loki.query_range(
+                q_ent, limit=10,
+                start_ns=query_start_ns, end_ns=query_end_ns,
+            )
         except Exception as e:
             log.warning("Failed to fetch entertainment context: %s", e)
             entertainment_rows = []
@@ -362,13 +443,10 @@ def make_conclusion(data: dict) -> str:
 # ── Data formatting helpers ───────────────────────────────────────────────────
 
 def ts_to_local(ts_ns: float, tz_str: str = REPORT_TIMEZONE) -> str:
-    try:
-        import zoneinfo
-        tz = zoneinfo.ZoneInfo(tz_str)
-    except Exception:
-        tz = timezone.utc
-    dt = datetime.fromtimestamp(ts_ns / 1e9, tz=tz)
-    return dt.strftime("%Y-%m-%d %H:%M")
+    """Convert a UTC nanosecond timestamp to local wall-clock time string."""
+    dt_utc = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc)
+    dt_local = dt_utc + timedelta(seconds=_SYSTZ_OFFSET)
+    return dt_local.strftime("%Y-%m-%d %H:%M")
 
 def parse_evidence_line(line: str) -> dict:
     """Parse a raw Loki log line into structured fields."""
