@@ -88,7 +88,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [24h]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [24h]))",
           "legendFormat": "",
           "queryType": "instant",
           "refId": "A"
@@ -140,7 +140,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (domain) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" | regexp \"-> (?P<domain>[^ ]+)\" [24h]))",
+          "expr": "sum by (domain) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" | regexp \"-> (?P<domain>[^ ]+)\" [24h]))",
           "legendFormat": "",
           "queryType": "instant",
           "refId": "A"
@@ -167,13 +167,13 @@
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
           "legendFormat": "🎮 {{client_name}}",
           "queryType": "range",
           "refId": "A"
         },
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discordapp[.]com|discord[.]gg|twitch[.]tv\" [5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" [5m]))",
           "legendFormat": "📺 {{client_name}} (entertainment)",
           "queryType": "range",
           "refId": "B"
@@ -205,7 +205,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
           "legendFormat": "{{client_name}}",
           "queryType": "range",
           "refId": "A"
@@ -241,7 +241,7 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=\"adguard\", client_name=~\"$client_name\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [24h]))",
+          "expr": "sum(count_over_time({job=\"adguard\", client_name=~\"$client_name\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [24h]))",
           "legendFormat": "",
           "queryType": "instant",
           "refId": "A"
@@ -266,7 +266,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|blox[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -289,7 +289,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discordapp[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A"
         }
