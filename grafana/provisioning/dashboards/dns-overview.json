@@ -1,21 +1,22 @@
 {
-  "title": "DNS Log Overview",
+  "title": "DNS — Parental Review",
   "uid": "dns-log-viz-v1",
   "schemaVersion": 39,
-  "version": 3,
-  "refresh": "30s",
+  "version": 4,
+  "refresh": "60s",
   "time": { "from": "now-24h", "to": "now" },
+  "description": "DNS evidence for gaming-related activity. Matches strongly suggest gaming-related behaviour but do not prove active gameplay with certainty.",
   "templating": {
     "list": [
       {
         "name": "client_name",
-        "label": "Device Name",
+        "label": "Child Device",
         "type": "query",
         "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
         "query": "label_values({job=\"adguard\"}, client_name)",
         "includeAll": true,
         "allValue": ".+",
-        "multi": false,
+        "multi": true,
         "refresh": 2,
         "sort": 1,
         "current": {}
@@ -31,11 +32,12 @@
         "multi": false,
         "refresh": 2,
         "sort": 1,
+        "hide": 1,
         "current": {}
       },
       {
         "name": "domain_search",
-        "label": "Domain search",
+        "label": "Domain filter",
         "type": "textbox",
         "query": "",
         "current": { "value": "" }
@@ -43,68 +45,183 @@
     ]
   },
   "panels": [
+
+    {
+      "id": 10,
+      "title": "Note",
+      "type": "text",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 2 },
+      "options": {
+        "mode": "markdown",
+        "content": "**DNS evidence** can strongly suggest gaming-related behaviour, but does not prove active gameplay with 100% certainty. Use this dashboard as a starting point for review conversations, not as absolute proof."
+      }
+    },
+
     {
       "id": 1,
-      "title": "DNS Query Volume",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 7 },
+      "title": "Gaming Activity Score by Device  (DNS hits — Confirmed + Web Gaming)",
+      "description": "Total gaming-category DNS queries per device in the selected time range. Higher = more activity.",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 2, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "sum by (client_name) (rate({job=\"adguard\", client=~\"$client\", client_name=~\"$client_name\"}[5m]))",
-          "legendFormat": "{{client_name}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
+      "options": {
+        "orientation": "horizontal",
+        "legend": { "displayMode": "hidden" },
+        "tooltip": { "mode": "single" },
+        "xField": "client_name"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 1, "fillOpacity": 10 }
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": { "fillOpacity": 80 }
         }
       },
-      "options": { "tooltip": { "mode": "multi" } }
-    },
-    {
-      "id": 2,
-      "title": "Blocked Queries (reason≥3)",
-      "type": "timeseries",
-      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 6 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
-          "expr": "sum by (client_name) (rate({job=\"adguard\", client=~\"$client\", client_name=~\"$client_name\", reason=~\"[3-9]\"}[5m]))",
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", category=~\"gaming|web_gaming\"}[$__range]))",
           "legendFormat": "{{client_name}}",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         }
-      ],
+      ]
+    },
+
+    {
+      "id": 2,
+      "title": "Top Game Domains  (selected devices, selected time range)",
+      "description": "Domain extracted from log line at query time — no extra labels stored. Only gaming and web-gaming category queries appear here.",
+      "type": "barchart",
+      "gridPos": { "x": 12, "y": 2, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "options": {
+        "orientation": "horizontal",
+        "legend": { "displayMode": "hidden" },
+        "tooltip": { "mode": "single" },
+        "xField": "domain"
+      },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "fixed", "fixedColor": "red" },
-          "custom": { "lineWidth": 1, "fillOpacity": 20 }
+          "custom": { "fillOpacity": 80 }
         }
-      }
-    },
-    {
-      "id": 3,
-      "title": "Query Types",
-      "type": "timeseries",
-      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 6 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      },
       "targets": [
         {
-          "expr": "sum by (query_type) (rate({job=\"adguard\", client=~\"$client\", client_name=~\"$client_name\"}[5m]))",
-          "legendFormat": "{{query_type}}",
+          "expr": "sum by (domain) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"} | regexp \"-> (?P<domain>[^ ]+)\" [$__range]))",
+          "legendFormat": "{{domain}}",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "title": "Gaming Activity Timeline  (zoom time range to study hours e.g. 3pm–7pm)",
+      "description": "Set the time range to study hours to see gaming during homework time. Each spike = cluster of gaming DNS queries in a 5-min window.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 7 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"}[5m]))",
+          "legendFormat": "🎮 {{client_name}}",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=\"entertainment\"}[5m]))",
+          "legendFormat": "📺 {{client_name}} (entertainment)",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "title": "Burst Detection  (gaming DNS hits per 5-min window — sustained spikes suggest active play)",
+      "description": "10+ gaming DNS hits in a 5-minute window is a strong indicator of an active game session. Orange = moderate, Red = high.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 17, "w": 16, "h": 6 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 1, "fillOpacity": 20 },
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"}[5m]))",
+          "legendFormat": "{{client_name}}",
           "queryType": "range",
           "refId": "A"
         }
       ]
     },
+
     {
-      "id": 4,
-      "title": "DNS Query Log",
+      "id": 5,
+      "title": "Blocked Gaming Queries",
+      "description": "Gaming-category DNS queries that AdGuard blocked (reason ≥ 3) in the selected time range.",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 17, "w": 8, "h": 6 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\", reason=~\"[3-9]\"}[$__range]))",
+          "legendFormat": "Blocked gaming queries",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 6,
+      "title": "Recent Gaming Evidence  (confirmed + web gaming DNS queries, newest first)",
+      "description": "Most recent gaming-related DNS lookups from selected devices. Use Domain filter above to search for a specific game. Each line = one DNS query.",
       "type": "logs",
-      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 14 },
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 10 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "options": {
         "showTime": true,
@@ -116,11 +233,62 @@
       },
       "targets": [
         {
-          "expr": "{job=\"adguard\", client=~\"$client\", client_name=~\"$client_name\"} |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\", category=~\"gaming|web_gaming\"} |~ \"(?i)${domain_search:raw}\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 7,
+      "title": "Entertainment Activity  (YouTube / Discord / Twitch — compare timing with gaming above)",
+      "description": "Entertainment DNS queries from selected devices. Review alongside the gaming timeline to spot co-occurring activity — e.g. Discord open while gaming.",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 33, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "signature"
+      },
+      "targets": [
+        {
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\", category=\"entertainment\"} |~ \"(?i)${domain_search:raw}\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 8,
+      "title": "School / Productivity Activity  (low activity here = no studying)",
+      "description": "DNS queries matching known educational platforms (Google Classroom, Docs, Khan Academy, Schoology, etc.). Low activity here during study time is a useful contrast against gaming activity above.",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 41, "w": 24, "h": 6 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "lineWidth": 1, "fillOpacity": 10 },
+          "color": { "mode": "fixed", "fixedColor": "blue" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\", category=\"school\"}[5m]))",
+          "legendFormat": "📚 {{client_name}}",
           "queryType": "range",
           "refId": "A"
         }
       ]
     }
+
   ]
 }
