@@ -1,0 +1,40 @@
+Build the first deployable version of the DNS and network log visualisation system described in the attached handoff document.
+
+Primary goal:
+Show which domains a specific device accessed, using AdGuard Home DNS query logs as the source of truth.
+
+Required stack:
+- Synology NAS
+- Docker Compose
+- Grafana
+- Loki
+- Grafana Alloy
+
+Locked rules:
+- Do not use domain as a Loki label in v1
+- Do not guess the UDM syslog format
+- Ingest raw UDM syslog only in v1 with static labels job="udm" and source="syslog"
+- Use AdGuard querylog.json as the primary data source
+- Keep the implementation conservative, debuggable, and easy to run on Synology
+
+Deliver all required files from the handoff, including:
+- docker-compose.yml
+- loki/config.yml
+- alloy/config.alloy
+- grafana/provisioning/datasources/loki.yml
+- .env.example
+- README.md
+- scripts/validate-stack.sh
+- scripts/tail-useful-logs.sh
+- scripts/backup-log-viz.sh
+- docs/deployment-notes.md
+- docs/validation-checklist.md
+- docs/next-steps-udm-parser.md
+
+Output requirements:
+- Provide exact file contents
+- Provide deployment commands
+- Provide validation steps
+- Clearly list any remaining operator inputs or placeholders
+
+Do not drift into later-stage ideas until the first deployable version is complete.

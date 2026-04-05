@@ -1,0 +1,6 @@
+.env
+.DS_Store
+loki/data/
+grafana/data/
+backups/
+*.log

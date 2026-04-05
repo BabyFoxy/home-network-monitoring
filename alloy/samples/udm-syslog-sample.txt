@@ -1,0 +1,8 @@
+# Paste a real UDM syslog line here after pointing the UDM SE at this host.
+#
+# To capture a sample:
+#   docker compose logs -f alloy | grep udm
+# or in Grafana Explore: {job="udm"} — copy one raw line here.
+#
+# Once you have a real sample, see docs/next-steps-udm-parser.md for
+# how to build a proper parser pipeline.

@@ -1,0 +1,127 @@
+// ============================================================
+// Loki write endpoint
+// ============================================================
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ============================================================
+// AdGuard Home — querylog.json ingestion
+// ============================================================
+
+local.file_match "adguard_querylog" {
+  path_targets = [{
+    __path__ = "/adguard-logs/querylog.json",
+  }]
+  sync_period = "5s"
+}
+
+loki.source.file "adguard_file" {
+  targets    = local.file_match.adguard_querylog.targets
+  forward_to = [loki.process.adguard_parse.receiver]
+}
+
+loki.process "adguard_parse" {
+  forward_to = [loki.write.default.receiver]
+
+  // Parse the JSON log line
+  stage.json {
+    expressions = {
+      client       = "client",
+      status       = "status",
+      reason       = "reason",
+      disallowed   = "disallowed",
+      upstream     = "upstream",
+      cached       = "cached",
+      event_time   = "time",
+    }
+  }
+
+  // Nested: client_info.name -> client_name
+  stage.json {
+    source      = ""
+    expressions = {
+      client_info_raw = "client_info",
+    }
+  }
+
+  stage.json {
+    source      = "client_info_raw"
+    expressions = {
+      client_name = "name",
+    }
+  }
+
+  // Nested: question.name -> domain, question.type -> query_type
+  stage.json {
+    source      = ""
+    expressions = {
+      question_raw = "question",
+    }
+  }
+
+  stage.json {
+    source      = "question_raw"
+    expressions = {
+      domain     = "name",
+      query_type = "type",
+    }
+  }
+
+  // Set timestamp from the event's own time field
+  stage.timestamp {
+    source = "event_time"
+    format = "RFC3339Nano"
+  }
+
+  // Promote low-cardinality fields to labels
+  stage.labels {
+    values = {
+      job        = "",
+      source     = "",
+      client     = "client",
+      client_name = "client_name",
+      query_type = "query_type",
+      disallowed = "disallowed",
+    }
+  }
+
+  // Set static labels (job and source)
+  stage.static_labels {
+    values = {
+      job    = "adguard",
+      source = "dns_querylog",
+    }
+  }
+
+  // Build a readable output line; domain stays in the log body
+  stage.template {
+    source   = "output"
+    template = "{{ .client }} ({{ .client_name }}) -> {{ .domain }} [{{ .query_type }}] status={{ .status }} reason={{ .reason }} blocked={{ .disallowed }} upstream={{ .upstream }} cached={{ .cached }}"
+  }
+
+  stage.output {
+    source = "output"
+  }
+}
+
+// ============================================================
+// UDM SE — raw syslog ingestion (UDP 5514)
+// ============================================================
+// Do NOT parse syslog fields yet.
+// Capture a real UDM sample first; see docs/next-steps-udm-parser.md
+
+loki.source.syslog "udm_raw" {
+  listener {
+    address  = "0.0.0.0:5514"
+    protocol = "udp"
+    labels = {
+      job    = "udm",
+      source = "syslog",
+    }
+  }
+  forward_to = [loki.write.default.receiver]
+}

@@ -1,0 +1,131 @@
+name: Validate and Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate configs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          required=(
+            docker-compose.yml
+            .env.example
+            loki/config.yml
+            alloy/config.alloy
+            grafana/provisioning/datasources/loki.yml
+            scripts/validate-stack.sh
+            scripts/tail-useful-logs.sh
+            scripts/backup-log-viz.sh
+            docs/deployment-notes.md
+            docs/validation-checklist.md
+            docs/next-steps-udm-parser.md
+          )
+          missing=0
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "MISSING: $f"
+              missing=$((missing + 1))
+            else
+              echo "OK: $f"
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: Validate docker-compose.yml syntax
+        run: |
+          pip install docker-compose 2>/dev/null || true
+          # Use docker compose config to validate (needs a .env)
+          cp .env.example .env
+          sed -i 's/192.168.1.XXX/127.0.0.1/' .env
+          docker compose config --quiet && echo "docker-compose.yml is valid"
+
+      - name: Validate Loki config is valid YAML
+        run: python3 -c "import yaml, sys; yaml.safe_load(open('loki/config.yml')); print('loki/config.yml: valid YAML')"
+
+      - name: Validate Grafana datasource is valid YAML
+        run: python3 -c "import yaml, sys; yaml.safe_load(open('grafana/provisioning/datasources/loki.yml')); print('datasources/loki.yml: valid YAML')"
+
+      - name: Check shell scripts are executable-ready (bash syntax)
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script" && echo "OK: $script"
+          done
+
+      - name: Check Alloy config has no obvious placeholders
+        run: |
+          if grep -r "YOUR_" alloy/config.alloy; then
+            echo "ERROR: unfilled placeholder in alloy/config.alloy"
+            exit 1
+          fi
+          echo "No unfilled placeholders found"
+
+  release:
+    name: Create release archive
+    needs: validate
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release archive
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          ARCHIVE="home-network-monitoring-${TAG}.tar.gz"
+
+          tar -czf "$ARCHIVE" \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='*.DS_Store' \
+            --exclude='loki/data' \
+            --exclude='grafana/data' \
+            .
+
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ env.TAG }}"
+          body: |
+            ## DNS Log-Viz Stack — ${{ env.TAG }}
+
+            ### Deploy on Synology
+
+            ```bash
+            # Download and extract on your NAS
+            cd /volume1/docker
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/home-network-monitoring-${{ env.TAG }}.tar.gz \
+              | tar -xzf - --strip-components=1 -C log-viz/
+
+            cd log-viz
+            cp .env.example .env
+            nano .env   # set GRAFANA_ADMIN_PASSWORD and NAS_IP
+            docker compose up -d
+            ```
+
+            ### Or update an existing deployment
+
+            ```bash
+            cd /volume1/docker/log-viz
+            git pull
+            docker compose up -d
+            ```
+
+            See README.md for full instructions.
+          files: ${{ env.ARCHIVE }}
+          draft: false
+          prerelease: false
