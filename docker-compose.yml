@@ -6,7 +6,7 @@ version: "3.8"
 # ─────────────────────────────────────────────
 
 networks:
-  log-viz-net:
+  hnm-net:
     driver: bridge
 
 volumes:
@@ -16,10 +16,10 @@ volumes:
 services:
   grafana:
     image: grafana/grafana:latest
-    container_name: log-viz-grafana
+    container_name: hnm-grafana
     restart: unless-stopped
     networks:
-      - log-viz-net
+      - hnm-net
     ports:
       - "3300:3000"
     environment:
@@ -28,35 +28,35 @@ services:
       GF_SERVER_ROOT_URL: http://${NAS_IP:-192.168.1.5}:3300
     volumes:
       - grafana-data:/var/lib/grafana
-      - /volume1/docker/log-viz/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /volume1/docker/home-network-monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
 
   loki:
     image: grafana/loki:latest
-    container_name: log-viz-loki
+    container_name: hnm-loki
     restart: unless-stopped
     networks:
-      - log-viz-net
+      - hnm-net
     ports:
       - "3100:3100"
     environment:
       TZ: Australia/Sydney
     volumes:
       - loki-data:/loki
-      - /volume1/docker/log-viz/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - /volume1/docker/home-network-monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
     command: -config.file=/etc/loki/local-config.yaml
 
   alloy:
     image: grafana/alloy:latest
-    container_name: log-viz-alloy
+    container_name: hnm-alloy
     restart: unless-stopped
     networks:
-      - log-viz-net
+      - hnm-net
     ports:
       - "5514:5514/udp"
       - "12345:12345"
     environment:
       TZ: Australia/Sydney
     volumes:
-      - /volume1/docker/log-viz/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /volume1/docker/home-network-monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /volume1/docker/adguard/work/data:/adguard-logs:ro
     command: run /etc/alloy/config.alloy
