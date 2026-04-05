@@ -312,6 +312,30 @@
             ]
           },
           {
+            "matcher": { "id": "byName", "options": "labels" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "labelTypes" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "id" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Num" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
             "matcher": { "id": "byName", "options": "Line" },
             "properties": [
               { "id": "custom.hidden", "value": true }
@@ -338,6 +362,10 @@
           "options": {
             "excludeByName": {
               "Line": true,
+              "labels": true,
+              "labelTypes": true,
+              "id": true,
+              "Num": true,
               "client": true,
               "job": true,
               "source": true,
@@ -382,20 +410,151 @@
     {
       "id": 7,
       "title": "Entertainment Activity  (YouTube / Discord / Twitch — compare timing with gaming above)",
-      "description": "Entertainment DNS queries from selected devices. Review alongside the gaming timeline to spot co-occurring activity — e.g. Discord open while gaming.",
-      "type": "logs",
+      "description": "Entertainment DNS queries from selected devices in the past 24 hours. Each row = one lookup. Red = blocked, green = allowed. Compare timing with gaming activity above.",
+      "type": "table",
       "gridPos": { "x": 0, "y": 33, "w": 24, "h": 8 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "options": {
-        "showTime": true,
-        "wrapLogMessage": false,
-        "enableLogDetails": true,
-        "sortOrder": "Descending",
-        "dedupStrategy": "signature"
+        "showHeader": true,
+        "footer": { "show": false },
+        "sortBy": [ { "desc": true, "displayName": "Time" } ]
       },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "text" } },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "client_name" },
+            "properties": [
+              { "id": "displayName", "value": "Device" },
+              { "id": "custom.cellOptions", "value": { "type": "text" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "domain" },
+            "properties": [
+              { "id": "displayName", "value": "Domain" },
+              { "id": "custom.cellOptions", "value": { "type": "text" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "query_type" },
+            "properties": [
+              { "id": "displayName", "value": "Query Type" },
+              { "id": "custom.cellOptions", "value": { "type": "text" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Status" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              { "id": "mappings", "value": [
+                { "type": "value", "options": { "<no value>": { "text": "ALLOWED", "color": "green" } } },
+                { "type": "value", "options": { "0": { "text": "ALLOWED", "color": "green" } } },
+                { "type": "value", "options": { "1": { "text": "ALLOWED", "color": "green" } } },
+                { "type": "value", "options": { "2": { "text": "ALLOWED", "color": "green" } } },
+                { "type": "value", "options": { "3": { "text": "BLOCKED", "color": "red" } } },
+                { "type": "value", "options": { "4": { "text": "BLOCKED", "color": "red" } } },
+                { "type": "value", "options": { "5": { "text": "BLOCKED", "color": "red" } } },
+                { "type": "value", "options": { "6": { "text": "BLOCKED", "color": "red" } } },
+                { "type": "value", "options": { "7": { "text": "BLOCKED", "color": "red" } } },
+                { "type": "value", "options": { "8": { "text": "BLOCKED", "color": "red" } } },
+                { "type": "value", "options": { "9": { "text": "BLOCKED", "color": "red" } } }
+              ]}
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Time" },
+            "properties": [
+              { "id": "custom.hidden", "value": false },
+              { "id": "unit", "value": "time:YYYY-MM-DD HH:mm:ss" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "labels" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "labelTypes" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "id" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Num" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Line" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "TraceID|tsNs|ts|insertRowNumber" },
+            "properties": [
+              { "id": "custom.hidden", "value": true }
+            ]
+          }
+        ]
+      },
+      "transforms": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "frame",
+            "fields": {}
+          }
+        },
+        {
+          "id": "organizeFields",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "labels": true,
+              "labelTypes": true,
+              "id": true,
+              "Num": true,
+              "client": true,
+              "job": true,
+              "source": true,
+              "filename": true,
+              "service_name": true,
+              "detected_level": true,
+              "category": true,
+              "reason": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "client_name": 1,
+              "domain": 2,
+              "query_type": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "client_name": "Device",
+              "domain": "Domain",
+              "query_type": "Query Type",
+              "Value": "Status"
+            }
+          }
+        }
+      ],
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\" | regexp \"-> (?P<domain>[^ ]+)\"",
           "queryType": "range",
           "refId": "A"
         }
