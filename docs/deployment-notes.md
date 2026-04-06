@@ -1,57 +1,89 @@
-# Deployment notes
+# Deployment Notes
 
 ## Prerequisites
 
 - Synology NAS with Docker and Docker Compose installed (Container Manager)
 - AdGuard Home already running at `/volume1/docker/adguard/`
-- SSH access to the NAS
+- SSH access to the NAS: `ssh -i ~/.ssh/id_nas -p 223 root@192.168.1.5`
+
+---
 
 ## First deployment
 
-### 1. Copy files to Synology
+### 1. Clone repo onto the NAS
 
-From your Mac:
 ```bash
-rsync -av /Volumes/AI_Drive/Projects/home-network-monitoring/ \
-  fox@192.168.1.NAS_IP:/volume1/docker/log-viz/ \
-  --exclude='.git' --exclude='.DS_Store'
-```
-
-Or clone the GitHub repo directly on the NAS:
-```bash
+ssh -i ~/.ssh/id_nas -p 223 root@192.168.1.5
 git clone https://github.com/BabyFoxy/home-network-monitoring.git \
-  /volume1/docker/log-viz
+  /volume1/docker/home-network-monitoring
 ```
 
 ### 2. Create the .env file
 
 ```bash
-cd /volume1/docker/log-viz
+cd /volume1/docker/home-network-monitoring
 cp .env.example .env
-nano .env    # set GRAFANA_ADMIN_PASSWORD and NAS_IP
+vi .env
 ```
 
-### 3. Fix permissions for bind mount directories
+Fill in all values — the minimum required set:
 
 ```bash
-mkdir -p /volume1/docker/log-viz/loki/data
-mkdir -p /volume1/docker/log-viz/grafana/data
-chmod 777 /volume1/docker/log-viz/loki/data
-chmod 777 /volume1/docker/log-viz/grafana/data
+# Grafana
+GRAFANA_ADMIN_PASSWORD=<your-password>
+
+# Loki (do not change)
+LOKI_URL=http://192.168.1.5:3100
+
+# Child device names — pipe-separated regex, must match client_name in DNS logs
+# Check exact names in Grafana dashboard variable dropdown
+CHILD_DEVICES=Ethan PC|EthanR-PC|MBP-S26226
+
+# Timezone (IANA)
+REPORT_TIMEZONE=Australia/Sydney
+
+# SMTP (Gmail example)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=you@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=you@gmail.com
+SMTP_TO=recipient@example.com
+SMTP_USE_TLS=true
 ```
 
-### 4. Start the stack
+### 3. Start the stack
 
 ```bash
-cd /volume1/docker/log-viz
+cd /volume1/docker/home-network-monitoring
 docker compose up -d
 ```
 
-### 5. Check everything is running
+### 4. Verify everything is running
 
 ```bash
 docker compose ps
-bash scripts/validate-stack.sh
+# All three services (loki, alloy, grafana) should show "Up"
+
+curl -s http://localhost:3100/loki/api/v1/ready   # loki
+curl -s http://localhost:12345/-/ready             # alloy
+```
+
+Open Grafana at `http://192.168.1.5:3300` and go to Explore → Loki, run:
+```
+{job="adguard"}
+```
+You should see lines like:
+```
+EthanR-PC → roblox.com [A]
+```
+
+### 5. Install the daily report cron
+
+```bash
+echo '0	7	*	*	*	root	cd /volume1/docker/home-network-monitoring && python3 scripts/send_daily_report.py >> /volume1/docker/home-network-monitoring/logs/report.log 2>&1' >> /etc/crontab
+mkdir -p /volume1/docker/home-network-monitoring/logs
+kill -HUP $(ps | grep crond | grep -v grep | awk '{print $1}')
 ```
 
 ---
@@ -60,6 +92,7 @@ bash scripts/validate-stack.sh
 
 ### Restart one service
 ```bash
+cd /volume1/docker/home-network-monitoring
 docker compose restart alloy
 docker compose restart loki
 docker compose restart grafana
@@ -72,43 +105,34 @@ docker compose logs -f loki
 docker compose logs -f grafana
 ```
 
-### Pull latest images and redeploy
+### Pull latest config from GitHub and restart
 ```bash
-docker compose pull
+cd /volume1/docker/home-network-monitoring
+git pull
 docker compose up -d
 ```
 
-### Validate AdGuard ingestion
+Named volumes (Loki data, Grafana state) are never touched by `up -d`.
 
-1. Open Grafana at `http://NAS_IP:3300`
-2. Go to Explore → select Loki datasource
-3. Run: `{job="adguard"}`
-4. You should see lines like:
-   `192.168.1.136 (Home Assistant) -> firmware.nanoleaf.me [A] status=NOERROR ...`
+### Update device enrichment (IP → name map)
 
-### Test UDM syslog arrival
-
-Point the UDM SE syslog to `NAS_IP:5514` (UDP), then:
+After adding a new device to the network:
 ```bash
-# Watch Alloy receive syslog in real time
-docker compose logs -f alloy
-
-# Or query in Grafana Explore:
-# {job="udm"}
+cd /volume1/docker/home-network-monitoring
+bash scripts/update-enrichment.sh
 ```
 
-### Test with netcat (simulate a UDM syslog message)
+This reads `enrichment/udm-hosts.json`, regenerates the IP→name dict in `alloy/config.alloy`, and reloads Alloy.
+
+### Test daily report manually
 ```bash
-echo "Apr  5 10:00:01 udm kernel: test message" | \
-  nc -u -w1 127.0.0.1 5514
+cd /volume1/docker/home-network-monitoring
+python3 scripts/send_daily_report.py
 ```
-Then check Grafana Explore for `{job="udm"}`.
 
----
+Leave `SMTP_HOST` empty in `.env` to print to stdout instead of sending email.
 
-## Where to paste a real UDM sample
-
-Once you have a real UDM syslog line, paste it into:
-`/volume1/docker/log-viz/alloy/samples/udm-syslog-sample.txt`
-
-Then follow `docs/next-steps-udm-parser.md` to build a proper parser.
+### View report log
+```bash
+tail -f /volume1/docker/home-network-monitoring/logs/report.log
+```
