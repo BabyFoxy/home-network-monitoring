@@ -420,7 +420,7 @@ def make_conclusion(data: dict) -> str:
 def ts_to_local(ts_ns: float) -> str:
     dt_utc = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc)
     # Convert to local system time
-    offset_s = -_time.timezone if _time.daylight == 0 else -_time.altzone
+    offset_s = -_time.altzone if _time.localtime().tm_isdst else -_time.timezone
     dt_local = dt_utc + timedelta(seconds=offset_s)
     return dt_local.strftime("%H:%M")   # time-only for mobile compactness
 

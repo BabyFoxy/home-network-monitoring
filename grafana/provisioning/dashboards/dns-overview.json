@@ -3,7 +3,7 @@
   "uid": "dns-log-viz-v1",
   "schemaVersion": 39,
   "version": 8,
-  "refresh": "5m",
+  "refresh": "2h",
   "time": {
     "from": "now-24h",
     "to": "now"
@@ -25,7 +25,21 @@
         "multi": true,
         "refresh": 2,
         "sort": 1,
-        "current": {}
+        "current": {
+          "selected": true,
+          "text": [
+            "Elissa PC",
+            "Ethan MBP",
+            "Ethan PC",
+            "EthanR-PC"
+          ],
+          "value": [
+            "Elissa PC",
+            "Ethan MBP",
+            "Ethan PC",
+            "EthanR-PC"
+          ]
+        }
       },
       {
         "name": "domain_search",
@@ -39,21 +53,6 @@
     ]
   },
   "panels": [
-    {
-      "id": 10,
-      "title": "Note",
-      "type": "text",
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 2
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "**DNS evidence** can strongly suggest gaming-related behaviour, but does not prove active gameplay with 100% certainty. Use this dashboard as a starting point for review conversations, not as absolute proof."
-      }
-    },
     {
       "id": 1,
       "title": "Gaming Activity Score by Device  (24h)",
