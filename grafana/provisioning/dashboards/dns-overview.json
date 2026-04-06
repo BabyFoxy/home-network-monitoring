@@ -1,5 +1,5 @@
 {
-  "title": "DNS — Parental Review",
+  "title": "DNS \u2014 Parental Review",
   "uid": "dns-log-viz-v1",
   "schemaVersion": 39,
   "version": 8,
@@ -301,7 +301,7 @@
     },
     {
       "id": 3,
-      "title": "Gaming Activity Timeline  (zoom time range to study hours e.g. 3pm–7pm)",
+      "title": "Gaming Activity Timeline  (zoom time range to study hours e.g. 3pm\u20137pm)",
       "description": "Set the time range to study hours to see gaming during homework time. Each spike = cluster of gaming DNS queries in a 5-min window.",
       "type": "timeseries",
       "gridPos": {
@@ -337,13 +337,13 @@
       "targets": [
         {
           "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
-          "legendFormat": "🎮 {{client_name}}",
+          "legendFormat": "\ud83c\udfae {{client_name}}",
           "queryType": "range",
           "refId": "A"
         },
         {
           "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" [5m]))",
-          "legendFormat": "📺 {{client_name}} (entertainment)",
+          "legendFormat": "\ud83d\udcfa {{client_name}} (entertainment)",
           "queryType": "range",
           "refId": "B"
         }
@@ -351,7 +351,7 @@
     },
     {
       "id": 4,
-      "title": "Burst Detection  (gaming DNS hits per 5-min window — sustained spikes suggest active play)",
+      "title": "Burst Detection  (gaming DNS hits per 5-min window \u2014 sustained spikes suggest active play)",
       "description": "10+ gaming DNS hits in a 5-minute window is a strong indicator of an active game session. Orange = moderate, Red = high.",
       "type": "timeseries",
       "gridPos": {
@@ -508,7 +508,7 @@
             "replace": false,
             "parse": {
               "type": "regex",
-              "expression": "^(?P<device>[^ ]+) → (?P<domain>[^ ]+) \\[[^\\]]+\\] — [^ ]+$"
+              "expression": "^(?P<device>[^ ]+) \u2192 (?P<domain>[^ ]+) \\[[^\\]]+\\] \u2014 [^ ]+$"
             }
           }
         },
@@ -571,7 +571,7 @@
     },
     {
       "id": 7,
-      "title": "Entertainment Activity  (YouTube / Discord / Twitch — compare timing with gaming above)",
+      "title": "Entertainment Activity  (YouTube / Discord / Twitch \u2014 compare timing with gaming above)",
       "description": "Entertainment DNS queries from selected devices in the past 24 hours. Each row = one lookup. Red = blocked, green = allowed. Compare timing with gaming activity above.",
       "type": "logs",
       "gridPos": {
@@ -590,7 +590,7 @@
         "prettifyLogMessage": false,
         "enableLogDetails": true,
         "sortOrder": "Descending",
-        "dedupStrategy": "signature"
+        "dedupStrategy": "none"
       },
       "transforms": [
         {
@@ -613,7 +613,7 @@
             "replace": false,
             "parse": {
               "type": "regex",
-              "expression": "^(?P<device>[^ ]+) → (?P<domain>[^ ]+) [^ ]+$"
+              "expression": "^(?P<device>[^ ]+) \u2192 (?P<domain>[^ ]+) [^ ]+$"
             }
           }
         },
@@ -654,7 +654,7 @@
       ],
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\" | regexp \"(?:->|→) (?P<domain>[^ ]+)\" | line_format \"{{.client_name}} → {{.domain}} [{{.query_type}}]\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\" | regexp \"(?:->|\u2192) (?P<domain>[^ ]+)\" | line_format \"{{.client_name}} \u2192 {{.domain}} [{{.query_type}}]\"",
           "queryType": "range",
           "refId": "A",
           "datasource": {

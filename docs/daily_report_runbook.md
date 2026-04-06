@@ -70,26 +70,30 @@ REPORT_TIMEZONE=Australia/Sydney \
 python3 scripts/send_daily_report.py
 ```
 
-### 4. Schedule via Synology Task Scheduler
+### 4. Schedule via /etc/crontab (active on NAS)
 
-1. Open **Control Panel → Task Scheduler**
-2. **Create → Scheduled Task → User-defined script**
-3. Configure:
-   - Task name: `Daily Gaming Report`
-   - User: `root`
-   - Schedule: daily at `07:00` (or your preferred time)
-4. Event: **Boot-up**
-5. Script:
+The cron entry is already installed in `/etc/crontab` on the NAS:
 
-```bash
-cd /volume1/docker/home-network-monitoring && \
-python3 scripts/send_daily_report.py >> /volume1/docker/home-network-monitoring/logs/report.log 2>&1
+```
+0	7	*	*	*	root	cd /volume1/docker/home-network-monitoring && python3 scripts/send_daily_report.py >> /volume1/docker/home-network-monitoring/logs/report.log 2>&1
 ```
 
-Create the log directory first:
+This runs every day at **07:00 NAS local time** and writes output to `logs/report.log`.
+
+To verify it is active:
 ```bash
-mkdir -p /volume1/docker/home-network-monitoring/logs
+grep send_daily /etc/crontab
 ```
+
+To update the time, edit `/etc/crontab` and reload crond:
+```bash
+# Edit the cron entry
+vi /etc/crontab
+# Reload
+kill -HUP $(ps | grep crond | grep -v grep | awk '{print $1}')
+```
+
+Log directory was created at `/volume1/docker/home-network-monitoring/logs/`.
 
 ---
 
