@@ -180,15 +180,12 @@ def fetch_report_data(loki: LokiClient) -> dict:
     child_re      = CHILD_DEVICES if CHILD_DEVICES else ".+"
 
     local_now       = _local_now()
-    local_yesterday = local_now.date() - timedelta(days=1)
-    report_date     = local_yesterday.strftime("%Y-%m-%d")
+    report_date     = (local_now - timedelta(hours=24)).strftime("%Y-%m-%d")
 
-    midnight_start = _midnight_local(local_yesterday)
-    midnight_end   = _midnight_local(local_now.date())
-    start_ns = _to_utc_ns(midnight_start)
-    end_ns   = _to_utc_ns(midnight_end)
+    end_ns   = _to_utc_ns(local_now)
+    start_ns = end_ns - int(24 * 3600 * 1e9)
 
-    log.info("Report for %s  window: %s → %s (local)", report_date, midnight_start, midnight_end)
+    log.info("Report for %s  window: last 24h ending %s (local)", report_date, local_now)
     log.info("UTC window: %s → %s",
              datetime.fromtimestamp(start_ns/1e9, tz=timezone.utc),
              datetime.fromtimestamp(end_ns/1e9, tz=timezone.utc))
