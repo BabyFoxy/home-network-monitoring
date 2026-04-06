@@ -617,6 +617,70 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "device"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Device"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "domain"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Domain"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query_type"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Query Type"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
           }
         ]
       },
@@ -637,20 +701,21 @@
               "service_name": true,
               "detected_level": true,
               "category": true,
-              "reason": true
+              "reason": true,
+              "status": true
             },
             "indexByName": {
               "Time": 0,
-              "Device": 1,
-              "Domain": 2,
-              "Query Type": 3,
-              "Status": 4
+              "device": 1,
+              "domain": 2,
+              "query_type": 3,
+              "status": 4
             },
             "renameByName": {
-              "Value": "Status",
-              "client_name": "Device",
+              "device": "Device",
               "domain": "Domain",
-              "query_type": "Query Type"
+              "query_type": "Query Type",
+              "status": "Status"
             }
           }
         },
@@ -850,6 +915,54 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "device"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Device"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "domain"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Domain"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "query_type"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Query Type"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              }
+            ]
           }
         ]
       },
@@ -870,19 +983,20 @@
               "service_name": true,
               "detected_level": true,
               "category": true,
-              "reason": true
+              "reason": true,
+              "status": true
             },
             "indexByName": {
               "Time": 0,
-              "Device": 1,
-              "Domain": 2,
-              "Query Type": 3
+              "device": 1,
+              "domain": 2,
+              "query_type": 3
             },
             "renameByName": {
-              "Value": "Status",
-              "client_name": "Device",
+              "device": "Device",
               "domain": "Domain",
-              "query_type": "Query Type"
+              "query_type": "Query Type",
+              "status": "Status"
             }
           }
         }
