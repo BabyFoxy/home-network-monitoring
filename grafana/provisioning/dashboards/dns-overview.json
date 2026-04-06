@@ -521,138 +521,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "client_name"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Device"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "domain"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Domain"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "query_type"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Query Type"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "reason"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Status"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "3": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "4": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "5": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "6": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "7": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "8": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "9": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "labels"
             },
             "properties": [
@@ -709,17 +577,50 @@
                 "value": true
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "BLOCKED": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "ALLOWED": {
+                        "text": "ALLOWED",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
       "transforms": [
-        {
-          "id": "extractFields",
-          "options": {
-            "source": "frame",
-            "fields": {}
-          }
-        },
         {
           "id": "organizeFields",
           "options": {
@@ -740,16 +641,16 @@
             },
             "indexByName": {
               "Time": 0,
-              "client_name": 1,
-              "domain": 2,
-              "query_type": 3,
-              "Value": 4
+              "Device": 1,
+              "Domain": 2,
+              "Query Type": 3,
+              "Status": 4
             },
             "renameByName": {
+              "Value": "Status",
               "client_name": "Device",
               "domain": "Domain",
-              "query_type": "Query Type",
-              "Value": "Status"
+              "query_type": "Query Type"
             }
           }
         },
@@ -765,62 +666,36 @@
         {
           "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\" | regexp \"-> (?P<domain>[^ ]+)\"",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "derivedFields": [
+            {
+              "name": "Device",
+              "matcherRegex": "^(?P<device>[^ ]+)",
+              "type": "string"
+            },
+            {
+              "name": "Domain",
+              "matcherRegex": "\u2192 (?P<domain>[^ ]+)",
+              "type": "string"
+            },
+            {
+              "name": "Query Type",
+              "matcherRegex": "\\[(?P<query_type>[^\\]]+)\\]",
+              "type": "string"
+            },
+            {
+              "name": "Status",
+              "matcherRegex": "\u2014 (?P<status>[A-Z]+)",
+              "type": "string"
+            }
+          ]
         }
       ],
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "replace": false,
-            "fields": {},
-            "parseFromLabel": {
-              "client_name": {
-                "label": "client_name"
-              },
-              "query_type": {
-                "label": "query_type"
-              },
-              "reason": {
-                "label": "reason"
-              }
-            }
-          }
-        },
-        {
-          "id": "extractFields",
-          "options": {
-            "replace": false,
-            "source": "Line",
-            "fields": {},
-            "parse": {
-              "domain": {
-                "type": "regexp",
-                "expr": "-> (?P<domain>[^ ]+)"
-              }
-            }
-          }
-        },
-        {
-          "id": "organizeFields",
-          "options": {
-            "excludeByName": {
-              "labels": true,
-              "Line": true,
-              "tsNs": true,
-              "labelTypes": true,
-              "id": true
-            },
-            "renameByName": {
-              "client_name": "Device",
-              "query_type": "Query Type",
-              "reason": "Status"
-            },
-            "indexByName": {},
-            "includeByName": {}
-          }
-        }
-      ]
+      "transformations": []
     },
     {
       "id": 7,
@@ -879,180 +754,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "client_name"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Device"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "domain"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Domain"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "query_type"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Query Type"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "reason"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Status"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "<no value>": {
-                        "text": "ALLOWED",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "ALLOWED",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "1": {
-                        "text": "ALLOWED",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "2": {
-                        "text": "ALLOWED",
-                        "color": "green"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "3": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "4": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "5": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "6": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "7": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "8": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  },
-                  {
-                    "type": "value",
-                    "options": {
-                      "9": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "labels"
             },
             "properties": [
@@ -1109,17 +810,50 @@
                 "value": true
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.hidden",
+                "value": false
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "BLOCKED": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "ALLOWED": {
+                        "text": "ALLOWED",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
       "transforms": [
-        {
-          "id": "extractFields",
-          "options": {
-            "source": "frame",
-            "fields": {}
-          }
-        },
         {
           "id": "organizeFields",
           "options": {
@@ -1140,16 +874,15 @@
             },
             "indexByName": {
               "Time": 0,
-              "client_name": 1,
-              "domain": 2,
-              "query_type": 3,
-              "Value": 4
+              "Device": 1,
+              "Domain": 2,
+              "Query Type": 3
             },
             "renameByName": {
+              "Value": "Status",
               "client_name": "Device",
               "domain": "Domain",
-              "query_type": "Query Type",
-              "Value": "Status"
+              "query_type": "Query Type"
             }
           }
         }
@@ -1158,62 +891,31 @@
         {
           "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\" | regexp \"-> (?P<domain>[^ ]+)\"",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "derivedFields": [
+            {
+              "name": "Device",
+              "matcherRegex": "^(?P<device>[^ ]+)",
+              "type": "string"
+            },
+            {
+              "name": "Domain",
+              "matcherRegex": "\u2192 (?P<domain>[^ ]+)",
+              "type": "string"
+            },
+            {
+              "name": "Query Type",
+              "matcherRegex": "\\[(?P<query_type>[^\\]]+)\\]",
+              "type": "string"
+            }
+          ]
         }
       ],
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "replace": false,
-            "fields": {},
-            "parseFromLabel": {
-              "client_name": {
-                "label": "client_name"
-              },
-              "query_type": {
-                "label": "query_type"
-              },
-              "reason": {
-                "label": "reason"
-              }
-            }
-          }
-        },
-        {
-          "id": "extractFields",
-          "options": {
-            "replace": false,
-            "source": "Line",
-            "fields": {},
-            "parse": {
-              "domain": {
-                "type": "regexp",
-                "expr": "-> (?P<domain>[^ ]+)"
-              }
-            }
-          }
-        },
-        {
-          "id": "organizeFields",
-          "options": {
-            "excludeByName": {
-              "labels": true,
-              "Line": true,
-              "tsNs": true,
-              "labelTypes": true,
-              "id": true
-            },
-            "renameByName": {
-              "client_name": "Device",
-              "query_type": "Query Type",
-              "reason": "Status"
-            },
-            "indexByName": {},
-            "includeByName": {}
-          }
-        }
-      ]
+      "transformations": []
     },
     {
       "id": 8,
