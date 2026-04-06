@@ -2,7 +2,7 @@
   "title": "DNS — Parental Review",
   "uid": "dns-log-viz-v1",
   "schemaVersion": 39,
-  "version": 7,
+  "version": 8,
   "refresh": "5m",
   "time": {
     "from": "now-24h",
@@ -654,7 +654,7 @@
       ],
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\" | regexp \"(?:->|→) (?P<domain>[^ ]+)\" | line_format \"{{.client_name}} → {{.domain}} [{{.query_type}}]\"",
           "queryType": "range",
           "refId": "A",
           "datasource": {
