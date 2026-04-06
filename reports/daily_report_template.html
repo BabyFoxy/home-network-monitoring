@@ -3,103 +3,295 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Home network gaming report — ${report_date}</title>
+<title>Gaming report — ${report_date}</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #222; font-size: 14px; max-width: 800px; margin: 0 auto; padding: 20px; }
-  h1 { font-size: 20px; font-weight: 600; color: #111; margin-bottom: 4px; }
-  h2 { font-size: 15px; font-weight: 600; color: #333; margin-top: 28px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-  .meta { color: #888; font-size: 13px; margin-bottom: 24px; }
-  .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 2fr; gap: 12px; margin-bottom: 24px; }
-  .stat-box { background: #f5f5f5; border-radius: 8px; padding: 12px 16px; }
-  .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .stat-value { font-size: 28px; font-weight: 700; color: #222; }
-  .stat-sub { font-size: 12px; color: #555; margin-top: 2px; line-height: 1.4; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  th { text-align: left; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 2px solid #eee; }
-  td { padding: 7px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; font-size: 13px; }
-  tr:hover td { background: #fafafa; }
-  .blocked { color: #c00; font-weight: 600; }
-  .allowed { color: #060; font-weight: 600; }
-  .inactive td { color: #aaa; }
-  .conclusion { background: #f9f9f9; border-left: 3px solid #666; padding: 12px 16px; margin: 16px 0; line-height: 1.7; }
-  .notes { background: #fffbf0; border: 1px solid #f0e0b0; border-radius: 6px; padding: 12px 16px; margin-top: 24px; font-size: 13px; line-height: 1.7; }
-  .notes li { margin-bottom: 4px; }
-  .no-activity { color: #aaa; font-style: italic; text-align: center; padding: 16px; }
-  .inactive-note td { font-size: 12px; color: #888; }
+/* ── Reset / base ── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #222;
+  background: #f2f2f7;
+  padding: 0;
+  margin: 0;
+}
+
+/* ── Outer wrapper ── */
+.wrapper {
+  max-width: 600px;
+  margin: 0 auto;
+  background: #f2f2f7;
+}
+
+/* ── Header ── */
+.header {
+  background: #1c1c1e;
+  color: #fff;
+  padding: 20px 16px 16px;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.header .meta {
+  font-size: 13px;
+  color: #ababab;
+  margin-top: 4px;
+}
+
+/* ── Section wrappers ── */
+.section {
+  background: #fff;
+  margin: 12px 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #888;
+  padding: 14px 16px 6px;
+}
+
+/* ── Summary stats: 2×2 grid on mobile ── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: #e5e5ea;
+}
+.stat-cell {
+  background: #fff;
+  padding: 14px 16px;
+}
+.stat-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.stat-value.alert { color: #c00; }
+.stat-value.ok    { color: #1a7f37; }
+
+/* ── Warning / attribution box ── */
+.warn-box {
+  margin: 0 16px 12px;
+  padding: 10px 12px;
+  background: #fff3cd;
+  border-left: 3px solid #f0ad00;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Top domains ── */
+.top-domains {
+  padding: 8px 16px 14px;
+  font-size: 13px;
+  color: #444;
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+/* ── Device cards ── */
+.device-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.device-card:last-child { border-bottom: none; }
+
+.card-header {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.card-alert .card-header { color: #c00; }
+.card-ok    .card-header { color: #1a7f37; }
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.card-row:last-of-type { border-bottom: none; }
+.card-label {
+  font-size: 12px;
+  color: #888;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+.card-value {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+.blocked-val { color: #c00; }
+
+.domain-list {
+  margin-top: 6px;
+  line-height: 2;
+}
+.domain-tag {
+  display: inline-block;
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 12px;
+  margin: 2px 3px 2px 0;
+  word-break: break-all;
+}
+.card-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* ── Evidence items ── */
+.evidence-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.evidence-item:last-child { border-bottom: none; }
+
+.ev-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.ev-label {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  width: 56px;
+  flex-shrink: 0;
+}
+.ev-val {
+  font-size: 13px;
+  text-align: right;
+  word-break: break-all;
+  flex: 1;
+}
+.domain-text { font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px; }
+
+/* Status colours */
+.blocked { color: #c00; font-weight: 700; }
+.allowed { color: #1a7f37; }
+
+.muted-block {
+  padding: 12px 16px;
+  color: #aaa;
+  font-style: italic;
+  font-size: 13px;
+}
+.muted { color: #aaa; }
+
+/* ── Conclusion ── */
+.conclusion-text {
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #333;
+}
+
+/* ── Footer notes ── */
+.footer {
+  padding: 14px 16px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.7;
+}
+.footer li { margin-left: 16px; margin-bottom: 2px; }
+
+/* ── Desktop: wider padding ── */
+@media (min-width: 500px) {
+  .wrapper { padding: 16px; }
+  .section { border-radius: 12px; }
+  .header  { border-radius: 12px 12px 0 0; }
+}
 </style>
 </head>
 <body>
-<h1>Home network gaming report</h1>
-<div class="meta">${report_date} &nbsp;&middot;&nbsp; Based on DNS evidence from the past 24 hours</div>
+<div class="wrapper">
 
-<h2>Summary</h2>
-<div class="summary-grid">
-  <div class="stat-box">
-    <div class="stat-label">Devices with activity</div>
-    <div class="stat-value">${active_device_count}</div>
+  <!-- Header -->
+  <div class="header">
+    <h1>Home network gaming report</h1>
+    <div class="meta">${report_date} &middot; DNS evidence from the previous 24 hours</div>
   </div>
-  <div class="stat-box">
-    <div class="stat-label">Gaming DNS hits</div>
-    <div class="stat-value">${total_hits}</div>
+
+  <!-- Summary -->
+  <div class="section">
+    <div class="section-title">Summary</div>
+    <div class="summary-grid">
+      <div class="stat-cell">
+        <div class="stat-label">Devices with activity</div>
+        <div class="stat-value">${active_device_count}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Gaming DNS hits</div>
+        <div class="stat-value">${total_hits}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Blocked hits</div>
+        <div class="stat-value">${total_blocked}</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Top domains</div>
+        <div class="top-domains">${top_domains_summary}</div>
+      </div>
+    </div>
+    ${attribution_html}
   </div>
-  <div class="stat-box">
-    <div class="stat-label">Blocked gaming hits</div>
-    <div class="stat-value">${total_blocked}</div>
+
+  <!-- Per device -->
+  <div class="section">
+    <div class="section-title">Per device</div>
+    ${device_cards_html}
   </div>
-  <div class="stat-box">
-    <div class="stat-label">Top gaming domains</div>
-    <div class="stat-sub">${top_domains_summary}</div>
+
+  <!-- Gaming evidence -->
+  <div class="section">
+    <div class="section-title">Recent gaming DNS queries</div>
+    ${evidence_items_html}
   </div>
-</div>
 
-<h2>Per device</h2>
-<table>
-<thead>
-  <tr>
-    <th>Device</th>
-    <th>Gaming hits</th>
-    <th>Blocked</th>
-    <th>Top domains</th>
-    <th>Entertainment</th>
-    <th>Note</th>
-  </tr>
-</thead>
-<tbody>
-${device_rows_html}
-</tbody>
-</table>
+  <!-- Entertainment context -->
+  <div class="section">
+    <div class="section-title">Entertainment activity (YouTube / Discord / Twitch)</div>
+    ${ent_items_html}
+  </div>
 
-<h2>Recent blocked gaming evidence</h2>
-<table>
-<thead>
-  <tr><th>Time</th><th>Device</th><th>Domain</th><th>Query type</th><th>Status</th></tr>
-</thead>
-<tbody>
-${evidence_rows_html}
-</tbody>
-</table>
+  <!-- Conclusion -->
+  <div class="section">
+    <div class="section-title">Conclusion</div>
+    <div class="conclusion-text">${conclusion}</div>
+  </div>
 
-<h2>Recent entertainment context</h2>
-<table>
-<thead>
-  <tr><th>Time</th><th>Device</th><th>Domain</th><th>Query type</th><th>Status</th></tr>
-</thead>
-<tbody>
-${ent_rows_html}
-</tbody>
-</table>
+  <!-- Notes -->
+  <div class="section footer">
+    <ul>
+      <li>DNS evidence strongly suggests gaming-related behaviour but does not prove exact gameplay duration.</li>
+      <li>Sustained bursts of repeated gaming DNS lookups are a stronger indicator than isolated single requests.</li>
+      <li>Blocked hits mean parental controls are working. Allowed hits mean the request was not blocked.</li>
+    </ul>
+  </div>
 
-<h2>Conclusion</h2>
-<div class="conclusion">${conclusion}</div>
-
-<div class="notes">
-  <strong>Notes</strong>
-  <ul>
-    <li>This report is based on DNS and network activity evidence.</li>
-    <li>It can strongly suggest gaming-related behaviour, but it is not proof of exact gameplay duration.</li>
-    <li>Repeated hits to Roblox, bloxd.io, and similar domains — especially with consistent timing — are stronger indicators than isolated single requests.</li>
-    <li>Blocked gaming DNS requests indicate that parental controls are working as configured.</li>
-  </ul>
 </div>
 </body>
 </html>

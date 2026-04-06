@@ -11,7 +11,6 @@ import re
 import sys
 import json
 import logging
-import textwrap
 import string
 from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
@@ -19,41 +18,26 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 import urllib.parse
-
-# ── Timezone utilities (stdlib-only, no pytz/zoneinfo required) ────────────────
-#
-# Australia/Sydney UTC offsets:
-#   AEST (standard): UTC+10  — active ~Apr-Sep
-#   AEDT (daylight saving): UTC+11 — active ~Oct-Mar
-# We detect the current offset from the system clock so DST transitions
-# are handled automatically regardless of Python version.
-#
-# On Synology NAS the system TZ is already set to the local timezone,
-# so datetime.now() gives correct local wall-clock time.
-#
 import time as _time
 
-# Seconds east of UTC for the current system zone (negative = west of Greenwich)
-_SYSTZ_OFFSET = -_time.timezone if _time.daylight == 0 else -_time.altzone
+# ── Timezone ────────────────────────────────────────────────────────────────────
+# On Synology NAS, datetime.now() gives correct local wall-clock time.
+# datetime.timestamp() on a naive datetime already converts using the system
+# timezone — do NOT manually subtract the offset or it will be applied twice.
 
-
-def _local_now():
-    """Current local datetime using the system timezone."""
+def _local_now() -> datetime:
     return datetime.now()
 
-
-def _midnight_local(date_obj):
-    """Midnight (00:00) of the given date in the system timezone."""
-    return datetime.combine(date_obj, datetime.min.time())
-
+def _midnight_local(d: date) -> datetime:
+    return datetime.combine(d, datetime.min.time())
 
 def _to_utc_ns(local_dt: datetime) -> int:
-    """Convert a naive local datetime to UTC nanoseconds since epoch."""
-    # local = UTC + offset_seconds
-    offset_s = _SYSTZ_OFFSET
-    utc_dt = local_dt - timedelta(seconds=offset_s)
-    return int(utc_dt.timestamp() * 1e9)
-import urllib.parse
+    """Convert a naive local datetime to UTC nanoseconds.
+    datetime.timestamp() uses the system local timezone automatically —
+    no manual offset arithmetic needed.
+    """
+    return int(local_dt.timestamp() * 1_000_000_000)
+
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +48,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("daily_report")
 
-# Ensure logs directory exists
 (Path(__file__).parent.parent / "logs").mkdir(exist_ok=True)
 
 
@@ -81,21 +64,16 @@ def _env(key: str, default: str = "") -> str:
     return val
 
 
-LOKI_URL          = _env("LOKI_URL", "http://192.168.1.5:3100")
-SMTP_HOST         = _env("SMTP_HOST", "")
-SMTP_PORT         = int(_env("SMTP_PORT", "587"))
-SMTP_USERNAME     = _env("SMTP_USERNAME", "")
-SMTP_PASSWORD     = _env("SMTP_PASSWORD", "")
-SMTP_FROM         = _env("SMTP_FROM", "")
-SMTP_TO          = _env("SMTP_TO", "")
-SMTP_USE_TLS     = _env("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
-REPORT_TIMEZONE   = _env("REPORT_TIMEZONE", "UTC")
-CHILD_DEVICES     = _env("CHILD_DEVICES", "")   # regex e.g. "Ethan PC|EthanR-PC"
+LOKI_URL       = _env("LOKI_URL", "http://192.168.1.5:3100")
+SMTP_HOST      = _env("SMTP_HOST", "")
+SMTP_PORT      = int(_env("SMTP_PORT", "587"))
+SMTP_USERNAME  = _env("SMTP_USERNAME", "")
+SMTP_PASSWORD  = _env("SMTP_PASSWORD", "")
+SMTP_FROM      = _env("SMTP_FROM", "")
+SMTP_TO        = _env("SMTP_TO", "")
+SMTP_USE_TLS   = _env("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
+CHILD_DEVICES  = _env("CHILD_DEVICES", "")   # regex matching client_name labels
 
-# Optional: map raw device names to parent-friendly display names.
-# Format: "raw_name=Display Name" separated by commas.
-# Devices not listed here are shown as-is.
-# Example in .env: DEVICE_DISPLAY_NAMES=MBP-S26226=Ethan PC,192.168.1.155=Living Room
 _DEVICE_DISPLAY_RAW = _env("DEVICE_DISPLAY_NAMES", "")
 DEVICE_DISPLAY_NAMES: dict = {}
 if _DEVICE_DISPLAY_RAW:
@@ -107,16 +85,20 @@ if _DEVICE_DISPLAY_RAW:
 def display_name(raw: str) -> str:
     return DEVICE_DISPLAY_NAMES.get(raw, raw)
 
-# Gaming domain filter — must match the dashboard rules exactly
-# Note: [.] matches a literal dot in LogQL RE2 regex; [[]] escapes [] in .format()
+
+# ── Domain patterns ─────────────────────────────────────────────────────────────
+# Use [.] (not \.) — Loki's RE2 engine rejects backslash-dot.
+# Do NOT use [[.]] — that is only relevant for Python str.format() brace escaping
+# and is malformed in LogQL regex.
+
 GAMING_PATTERNS = (
-    "roblox|rbxcdn|rbxusercontent|bloxd[[.]]io|mojang|minecraft"
-    "|crazygames|poki[[.]]com|now[[.]]gg|itch[[.]]io|lagged[[.]]com"
-    "|gameflare|friv[[.]]com|y8[[.]]com|miniclip|kizi[[.]]com"
+    "roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft"
+    "|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com"
+    "|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com"
 )
 ENTERTAINMENT_PATTERNS = (
-    "youtube[[.]]com|ytimg[[.]]com|googlevideo[[.]]com"
-    "|discord[[.]]com|discord[[.]]gg|twitch[[.]]tv"
+    "youtube[.]com|ytimg[.]com|googlevideo[.]com"
+    "|discord[.]com|discord[.]gg|discordapp[.]com|twitch[.]tv"
 )
 
 
@@ -126,41 +108,41 @@ class LokiClient:
     def __init__(self, base_url: str):
         self.base = base_url.rstrip("/")
 
-    def _strip_json_prefix(self, raw: bytes) -> dict:
+    def _parse(self, raw: bytes) -> dict:
         text = raw.decode("utf-8", errors="replace")
-        # Loki may prefix JSON with log lines (chunked / protobuf headers)
         idx = text.find("{")
         if idx < 0:
-            raise ValueError("No JSON found in Loki response")
+            raise ValueError("No JSON in Loki response")
         return json.loads(text[idx:])
 
-    def query(self, expr: str) -> dict:
-        log.debug("Loki query: %s", expr[:120])
-        payload = f"query={urllib.parse.quote(expr)}".encode()
+    def metric_instant(self, expr: str, at_ns: int) -> list:
+        """Run an instant metric query at a specific UTC nanosecond timestamp.
+        Returns list of {metric: {labels}, value: [ts, value_str]} dicts.
+        """
+        log.debug("metric_instant: %s", expr[:120])
+        url = f"{self.base}/loki/api/v1/query?" + urllib.parse.urlencode({
+            "query": expr,
+            "time":  int(at_ns / 1e9),
+        })
         try:
-            req = urllib.request.Request(
-                f"{self.base}/loki/api/v1/query",
-                data=payload,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                return self._strip_json_prefix(resp.read())
+            with urllib.request.urlopen(url, timeout=120) as r:
+                data = self._parse(r.read())
+            return data.get("data", {}).get("result", [])
         except urllib.error.HTTPError as e:
             body = e.read()[:500]
             raise RuntimeError(f"Loki HTTP {e.code}: {body}") from e
         except Exception as e:
-            raise RuntimeError(f"Loki request failed: {e}") from e
+            raise RuntimeError(f"Loki metric_instant failed: {e}") from e
 
-    def query_range(self, expr: str, limit: int = 20,
+    def query_range(self, expr: str, limit: int = 50,
                     start_ns: int = None, end_ns: int = None) -> list:
-        now_ns = datetime.now(timezone.utc).timestamp() * 1e9
+        """Fetch log lines. Returns list of (ts_ns_float, line_str) tuples."""
+        now_ns = int(datetime.now(timezone.utc).timestamp() * 1e9)
         if start_ns is None:
-            start_ns = now_ns - (8640 * 1e9)
+            start_ns = now_ns - 86_400 * 1_000_000_000
         if end_ns is None:
             end_ns = now_ns
-        log.debug("Loki query_range: %s  [%s → %s]",
-                  expr[:120], int(start_ns), int(end_ns))
+        log.debug("query_range limit=%d: %s", limit, expr[:120])
         payload = urllib.parse.urlencode({
             "query": expr,
             "limit": limit,
@@ -174,176 +156,190 @@ class LokiClient:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = self._strip_json_prefix(resp.read())
+            with urllib.request.urlopen(req, timeout=120) as r:
+                data = self._parse(r.read())
         except urllib.error.HTTPError as e:
             body = e.read()[:500]
             raise RuntimeError(f"Loki HTTP {e.code}: {body}") from e
         except Exception as e:
             raise RuntimeError(f"Loki query_range failed: {e}") from e
 
-        results = data.get("data", {}).get("result", [])
         rows = []
-        for stream in results:
+        for stream in data.get("data", {}).get("result", []):
             for ts_ns, line in stream.get("values", []):
                 rows.append((float(ts_ns), line))
-        rows.sort(key=lambda r: r[0], reverse=True)  # newest first
+        rows.sort(key=lambda r: r[0], reverse=True)
         return rows
 
 
 # ── Data fetching ────────────────────────────────────────────────────────────────
 
-
 def fetch_report_data(loki: LokiClient) -> dict:
-    gaming = GAMING_PATTERNS
+    gaming        = GAMING_PATTERNS
     entertainment = ENTERTAINMENT_PATTERNS
-    child_re = CHILD_DEVICES or "."
+    child_re      = CHILD_DEVICES if CHILD_DEVICES else ".+"
 
-    # ── Single consistent Sydney-local report window ───────────────────────────
-    # Report covers the previous full calendar day in the system timezone.
-    local_now      = _local_now()
+    local_now       = _local_now()
     local_yesterday = local_now.date() - timedelta(days=1)
-    report_date    = local_yesterday.strftime("%Y-%m-%d")
+    report_date     = local_yesterday.strftime("%Y-%m-%d")
 
-    # Exact UTC nanosecond bounds for the Sydney midnight→midnight window
-    midnight_start = _midnight_local(local_yesterday)   # midnight of yesterday (local)
-    midnight_end   = _midnight_local(local_now.date())    # midnight of today (local)
+    midnight_start = _midnight_local(local_yesterday)
+    midnight_end   = _midnight_local(local_now.date())
     start_ns = _to_utc_ns(midnight_start)
     end_ns   = _to_utc_ns(midnight_end)
 
-    log.info("Report for %s  window: %s → %s (Sydney local)",
-             report_date, midnight_start, midnight_end)
+    log.info("Report for %s  window: %s → %s (local)", report_date, midnight_start, midnight_end)
+    log.info("UTC window: %s → %s",
+             datetime.fromtimestamp(start_ns/1e9, tz=timezone.utc),
+             datetime.fromtimestamp(end_ns/1e9, tz=timezone.utc))
 
-    # ── Fetch all gaming entries for the day in one query per filter ──────────
-    # Evidence rows: need raw entries (limit 15)
+    duration_s = int((end_ns - start_ns) / 1e9)
+    dur = f"{duration_s}s"
+
+    # ── True total counts via metric queries (not limited by query line cap) ────
+    def safe_count(expr: str) -> int:
+        try:
+            result = loki.metric_instant(expr, at_ns=end_ns)
+            if result:
+                return int(float(result[0]["value"][1]))
+            return 0
+        except Exception as e:
+            log.warning("Count query failed (%s): %s", expr[:60], e)
+            return -1  # -1 = unknown
+
+    total_hits = safe_count(
+        f'sum(count_over_time({{job="adguard"}} |~ "{gaming}" [{dur}]))'
+    )
+    total_blocked = safe_count(
+        f'sum(count_over_time({{job="adguard", reason=~"[3-9]"}} |~ "{gaming}" [{dur}]))'
+    )
+
+    # ── Per-device gaming hit counts via metric query (all devices) ─────────────
     try:
-        raw_evidence = loki.query_range(
-            f'{{job="adguard", reason=~"[3-9]"}}'
-            f' |~ "{gaming}"'
-            f' | regexp "-> (?P<domain>[^ ]+)"',
-            limit=15, start_ns=start_ns, end_ns=end_ns,
+        dev_result = loki.metric_instant(
+            f'sum by (client_name) (count_over_time({{job="adguard"}} |~ "{gaming}" [{dur}]))',
+            at_ns=end_ns,
+        )
+        device_hits_all = {
+            r["metric"].get("client_name", "(unknown)"): int(float(r["value"][1]))
+            for r in dev_result
+        }
+    except Exception as e:
+        log.warning("Per-device gaming count failed: %s", e)
+        device_hits_all = {}
+
+    # Filter to child devices if configured; fall back to all if nothing matches.
+    device_hits = {d: h for d, h in device_hits_all.items() if re.search(child_re, d)}
+    child_filter_active = bool(CHILD_DEVICES)
+    unattributed = False
+    if child_filter_active and not device_hits and device_hits_all:
+        # Gaming activity exists but none matched CHILD_DEVICES regex.
+        # Use all devices so the report is not silently empty.
+        device_hits  = device_hits_all
+        unattributed = True
+        log.warning(
+            "CHILD_DEVICES regex %r matched no active device names %s — "
+            "reporting all devices as fallback",
+            child_re, list(device_hits_all.keys()),
+        )
+
+    # ── Per-device blocked counts ────────────────────────────────────────────────
+    try:
+        blocked_result = loki.metric_instant(
+            f'sum by (client_name) (count_over_time({{job="adguard", reason=~"[3-9]"}} |~ "{gaming}" [{dur}]))',
+            at_ns=end_ns,
+        )
+        device_blocked = {
+            r["metric"].get("client_name", "(unknown)"): int(float(r["value"][1]))
+            for r in blocked_result
+            if r["metric"].get("client_name", "(unknown)") in device_hits
+        }
+    except Exception as e:
+        log.warning("Per-device blocked count failed: %s", e)
+        device_blocked = {}
+
+    # ── Top domains globally via metric + regexp extraction ──────────────────────
+    try:
+        dom_result = loki.metric_instant(
+            f'topk(10, sum by (domain) (count_over_time({{job="adguard"}} |~ "{gaming}" | regexp "-> (?P<domain>[^ ]+)" [{dur}])))',
+            at_ns=end_ns,
+        )
+        top_domains = {
+            r["metric"].get("domain", "?"): int(float(r["value"][1]))
+            for r in dom_result
+        }
+        top_domains = dict(sorted(top_domains.items(), key=lambda x: -x[1]))
+    except Exception as e:
+        log.warning("Top domains query failed: %s", e)
+        top_domains = {}
+
+    # ── Per-device top domains ───────────────────────────────────────────────────
+    device_domain_counts: dict = {}
+    for dev in device_hits:
+        try:
+            r2 = loki.metric_instant(
+                f'topk(5, sum by (domain) (count_over_time({{job="adguard", client_name="{dev}"}} |~ "{gaming}" | regexp "-> (?P<domain>[^ ]+)" [{dur}])))',
+                at_ns=end_ns,
+            )
+            device_domain_counts[dev] = dict(sorted(
+                {x["metric"].get("domain", "?"): int(float(x["value"][1])) for x in r2}.items(),
+                key=lambda x: -x[1],
+            ))
+        except Exception as e:
+            log.warning("Per-device domain query failed for %s: %s", dev, e)
+
+    # ── Recent evidence rows (gaming — all, not just blocked) ───────────────────
+    try:
+        evidence_rows = loki.query_range(
+            f'{{job="adguard"}} |~ "{gaming}"',
+            limit=20, start_ns=start_ns, end_ns=end_ns,
         )
     except Exception as e:
-        log.warning("Failed to fetch blocked evidence: %s", e)
-        raw_evidence = []
+        log.warning("Evidence query failed: %s", e)
+        evidence_rows = []
 
-    # Per-device: need all entries (no limit) filtered to child devices
-    try:
-        raw_device = loki.query_range(
-            f'{{job="adguard", client_name=~"{child_re}"}}'
-            f' |~ "{gaming}"',
-            start_ns=start_ns, end_ns=end_ns,
-        )
-    except Exception as e:
-        log.warning("Failed to fetch device gaming entries: %s", e)
-        raw_device = []
+    # ── Entertainment context (active devices only) ──────────────────────────────
+    def _re2(s: str) -> str:
+        # Escape RE2 metacharacters but NOT spaces — re.escape escapes spaces
+        # as '\ ' which Loki's RE2 parser rejects.
+        return re.sub(r'([.+*?()\[\]{}^$|\\])', r'\\\1', s)
 
-    # Per-device blocked entries
-    try:
-        raw_blocked = loki.query_range(
-            f'{{job="adguard", client_name=~"{child_re}", reason=~"[3-9]"}}'
-            f' |~ "{gaming}"',
-            start_ns=start_ns, end_ns=end_ns,
-        )
-    except Exception as e:
-        log.warning("Failed to fetch device blocked entries: %s", e)
-        raw_blocked = []
-
-    # All gaming entries (for global totals and top domains)
-    try:
-        raw_all = loki.query_range(
-            f'{{job="adguard"}}'
-            f' |~ "{gaming}"'
-            f' | regexp "-> (?P<domain>[^ ]+)"',
-            start_ns=start_ns, end_ns=end_ns,
-        )
-    except Exception as e:
-        log.warning("Failed to fetch all gaming entries: %s", e)
-        raw_all = []
-
-    # ── Aggregate in Python ───────────────────────────────────────────────────
-    # Per-device gaming hit counts
-    device_hits = {}
-    for _, line in raw_device:
-        m = re.search(r"^([^ ]+)", line)
-        if m:
-            dev = m.group(1)
-            device_hits[dev] = device_hits.get(dev, 0) + 1
-
-    # Per-device blocked counts
-    device_blocked = {}
-    for _, line in raw_blocked:
-        m = re.search(r"^([^ ]+)", line)
-        if m:
-            device_blocked[m.group(1)] = device_blocked.get(m.group(1), 0) + 1
-
-    # Total counts
-    total_hits    = len(raw_all)
-    total_blocked = sum(1 for _, line in raw_blocked)
-
-    # Top domains (all devices)
-    domain_counts = {}
-    for _, line in raw_all:
-        m = re.search(r"-> ([^ ]+)", line)
-        if m:
-            domain_counts[m.group(1)] = domain_counts.get(m.group(1), 0) + 1
-    top_domains = dict(sorted(domain_counts.items(), key=lambda x: -x[1])[:10])
-
-    # Per-device top domains
-    # Build per-device line lists from raw_all (already has domain)
-    dev_domains: dict = {}
-    for _, line in raw_all:
-        dev_m = re.search(r"^([^ ]+)", line)
-        dom_m = re.search(r"-> ([^ ]+)", line)
-        if dev_m and dom_m:
-            dev_domains.setdefault(dev_m.group(1), []).append(dom_m.group(1))
-
-    device_domain_counts = {}
-    for dev, domains in dev_domains.items():
-        counts = {}
-        for d in domains:
-            counts[d] = counts.get(d, 0) + 1
-        device_domain_counts[dev] = dict(sorted(counts.items(), key=lambda x: -x[1])[:5])
-
-    # Active devices (those with any gaming activity)
-    active_devices = [d for d, hits in device_hits.items() if hits > 0]
-    active_devices_re = "|".join(re.escape(d) for d in active_devices) if active_devices else "NODEVICES"
-
-    # Entertainment rows (active devices only)
-    if active_devices_re != "NODEVICES":
+    active_re = "|".join(_re2(d) for d in device_hits) if device_hits else None
+    if active_re:
         try:
             entertainment_rows = loki.query_range(
-                f'{{job="adguard", client_name=~"{active_devices_re}"}}'
-                f' |~ "{entertainment}"'
-                f' | regexp "-> (?P<domain>[^ ]+)"',
-                limit=10, start_ns=start_ns, end_ns=end_ns,
+                f'{{job="adguard", client_name=~"{active_re}"}} |~ "{entertainment}"',
+                limit=15, start_ns=start_ns, end_ns=end_ns,
             )
         except Exception as e:
-            log.warning("Failed to fetch entertainment context: %s", e)
+            log.warning("Entertainment query failed: %s", e)
             entertainment_rows = []
     else:
         entertainment_rows = []
 
-    # Entertainment domain set for conclusion
     entertainment_domains = set()
     for _, line in entertainment_rows:
         m = re.search(r"-> ([^ ]+)", line)
         if m:
             entertainment_domains.add(m.group(1))
-    entertainment_summary = ", ".join(sorted(entertainment_domains)) if entertainment_domains else "none observed"
+    entertainment_summary = (
+        ", ".join(sorted(entertainment_domains)) if entertainment_domains else "none observed"
+    )
 
     return {
-        "report_date":          report_date,
-        "active_device_count":  len(active_devices),
-        "total_hits":           total_hits,
-        "total_blocked":        total_blocked,
-        "device_hits":          device_hits,
-        "device_blocked":       device_blocked,
+        "report_date":           report_date,
+        "active_device_count":   len(device_hits),
+        "total_hits":            total_hits,
+        "total_blocked":         total_blocked,
+        "device_hits":           device_hits,
+        "device_blocked":        device_blocked,
         "device_domain_counts":  device_domain_counts,
-        "top_domains":          top_domains,
-        "evidence_rows":        raw_evidence,
-        "entertainment_rows":   entertainment_rows,
+        "top_domains":           top_domains,
+        "evidence_rows":         evidence_rows,
+        "entertainment_rows":    entertainment_rows,
         "entertainment_summary": entertainment_summary,
+        "unattributed":          unattributed,
+        "child_filter_active":   child_filter_active,
     }
 
 
@@ -351,80 +347,106 @@ def fetch_report_data(loki: LokiClient) -> dict:
 
 def make_note(device: str, hits: int, blocked: int) -> str:
     if hits == 0:
-        return "No significant gaming-related activity detected today."
-    if hits > 20:
-        return f"Strong Roblox-related activity observed ({hits} hits)."
-    if hits > 5:
-        return f"Moderate gaming-related activity detected ({hits} hits)."
-    return f"Limited gaming-related activity ({hits} hits)."
+        return "No gaming-related activity detected."
+    allowed = hits - blocked
+    if blocked == hits:
+        return f"All {hits} gaming-related DNS requests were blocked by parental controls."
+    if blocked > 0:
+        return f"{hits} gaming DNS hits detected — {blocked} blocked, {allowed} allowed through."
+    if hits > 50:
+        return f"High gaming-related activity ({hits} DNS hits). Review recommended."
+    if hits > 10:
+        return f"Moderate gaming-related activity ({hits} DNS hits)."
+    return f"Low gaming-related activity ({hits} DNS hits)."
 
 
 def make_conclusion(data: dict) -> str:
-    active = data["active_device_count"]
-    total = data["total_hits"]
+    total   = data["total_hits"]
     blocked = data["total_blocked"]
-    domains = data["top_domains"]
-    ent = data["entertainment_summary"]
+    active  = data["active_device_count"]
+    unattr  = data.get("unattributed", False)
 
-    if active == 0:
-        return (
-            "No significant gaming-related activity was detected on "
-            "any configured child devices today."
-        )
+    # No data at all
+    if total <= 0:
+        return "No gaming-related DNS activity was detected in the reporting window."
+
+    # Activity exists but unknown count (query failed)
+    if total == -1:
+        total_str = "an unknown number of"
+    else:
+        total_str = str(total)
 
     parts = []
-    for dev, hits in sorted(data["device_hits"].items(), key=lambda x: -x[1]):
-        if hits == 0:
-            continue
-        dev_blocked = data["device_blocked"].get(dev, 0)
-        top_domains_str = ", ".join(f"{d} ({c})" for d, c in list(data["device_domain_counts"].get(dev, {}).items())[:3])
-        if dev_blocked > 0:
-            parts.append(
-                f"{dev} showed gaming-related activity today ({hits} hits). "
-                f"Most gaming-related DNS requests were blocked. "
-                f"Top domains: {top_domains_str}."
-            )
-        else:
-            parts.append(
-                f"{dev} had gaming-related DNS activity ({hits} hits). "
-                f"Top domains: {top_domains_str}."
-            )
 
-    conclusion = " ".join(parts)
+    # Unattributed fallback
+    if unattr:
+        parts.append(
+            f"Gaming-related DNS activity was detected ({total_str} queries total), "
+            "however none of the active devices matched the configured CHILD_DEVICES filter. "
+            "The activity below is reported across all devices as a fallback. "
+            "Check that CHILD_DEVICES in .env matches the actual device names shown."
+        )
+    elif active == 0:
+        # total > 0 but no per-device attribution at all
+        parts.append(
+            f"Gaming-related DNS activity was detected ({total_str} queries total), "
+            "but could not be attributed to any specific device. "
+            "This may indicate the device name enrichment is not yet applied to historical logs."
+        )
+    else:
+        for dev, hits in sorted(data["device_hits"].items(), key=lambda x: -x[1]):
+            if hits == 0:
+                continue
+            dev_blocked = data["device_blocked"].get(dev, 0)
+            top_doms = ", ".join(
+                f"{d} ({c})" for d, c in list(data["device_domain_counts"].get(dev, {}).items())[:3]
+            ) or "unknown"
+            parts.append(make_note(dev, hits, dev_blocked) + f" Top domains: {top_doms}.")
+
+    if blocked > 0 and not unattr and active > 0:
+        parts.append(
+            f"{blocked} of {total_str} gaming DNS requests were blocked by parental controls."
+        )
+
+    ent = data.get("entertainment_summary", "none observed")
     if ent != "none observed":
-        conclusion += f" Entertainment-related activity was also observed: {ent}."
-    return conclusion
+        parts.append(f"Entertainment-related activity was also observed: {ent}.")
+
+    return " ".join(parts)
 
 
-# ── Data formatting helpers ───────────────────────────────────────────────────
+# ── Formatting helpers ─────────────────────────────────────────────────────────
 
-def ts_to_local(ts_ns: float, tz_str: str = REPORT_TIMEZONE) -> str:
-    """Convert a UTC nanosecond timestamp to local wall-clock time string."""
+def ts_to_local(ts_ns: float) -> str:
     dt_utc = datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc)
-    dt_local = dt_utc + timedelta(seconds=_SYSTZ_OFFSET)
-    return dt_local.strftime("%Y-%m-%d %H:%M")
+    # Convert to local system time
+    offset_s = -_time.timezone if _time.daylight == 0 else -_time.altzone
+    dt_local = dt_utc + timedelta(seconds=offset_s)
+    return dt_local.strftime("%H:%M")   # time-only for mobile compactness
 
-def parse_evidence_line(line: str) -> dict:
-    """Parse a raw Loki log line into structured fields."""
-    # Format: "client_name -> domain [query_type] ..."
-    client_m = re.search(r"^([^ ]+)", line)
+
+def parse_log_line(line: str) -> dict:
+    """Parse a Loki log line: 'Client Name (IP) -> domain.com [TYPE] cat=X reason=N ...'"""
+    # Full client name is everything up to the first " ("
+    device_m = re.search(r"^(.+?) \(", line)
     domain_m = re.search(r"-> ([^ ]+)", line)
-    type_m = re.search(r"\[([^\]]+)\]", line)
+    type_m   = re.search(r"\[([A-Z]+)\]", line)
     reason_m = re.search(r"reason=([0-9]+|<no value>)", line)
-    ts_m = re.search(r"^\[([0-9.]+)\]", line)
 
-    device = client_m.group(1) if client_m else "?"
+    device = device_m.group(1) if device_m else line.split()[0] if line else "?"
     domain = domain_m.group(1) if domain_m else "?"
-    qt = type_m.group(1) if type_m else "?"
-    reason = reason_m.group(1) if reason_m else "<no value>"
-    is_blocked = reason not in ("<no value>", "0", "1", "2")
+    qt     = type_m.group(1)   if type_m   else "?"
+    reason = reason_m.group(1) if reason_m else "0"
+    blocked = reason not in ("<no value>", "0", "1", "2")
 
     return {
-        "device": device,
-        "domain": domain,
-        "query_type": qt,
-        "reason": reason,
-        "status": "BLOCKED" if is_blocked else "ALLOWED",
+        "device":      device,
+        "domain":      domain,
+        "query_type":  qt,
+        "reason":      reason,
+        "blocked":     blocked,
+        "status":      "BLOCKED" if blocked else "allowed",
+        "status_class": "blocked" if blocked else "allowed",
     }
 
 
@@ -435,170 +457,207 @@ _TEMPLATE_PATH = Path(__file__).parent.parent / "reports" / "daily_report_templa
 
 def _load_template() -> string.Template:
     if not _TEMPLATE_PATH.exists():
-        raise FileNotFoundError(
-            f"Email template not found: {_TEMPLATE_PATH}. "
-            "Ensure reports/daily_report_template.html is present."
-        )
+        raise FileNotFoundError(f"Template not found: {_TEMPLATE_PATH}")
     return string.Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
-def _build_rows(data: dict) -> dict:
-    tz = REPORT_TIMEZONE
-    # Top domains summary
-    top_str = ", ".join(
-        f"{d} ({c})" for d, c in data["top_domains"].items()
-    ) if data["top_domains"] else "none"
+def _build_substitutions(data: dict) -> dict:
+    total   = data["total_hits"]
+    blocked = data["total_blocked"]
+    active  = data["active_device_count"]
+    unattr  = data.get("unattributed", False)
 
-    # Per-device rows
-    device_rows = []
+    total_display   = str(total)   if total   >= 0 else "unknown"
+    blocked_display = str(blocked) if blocked >= 0 else "unknown"
+
+    # Top domains summary (text)
+    top_str = ", ".join(f"{d} ({c})" for d, c in data["top_domains"].items()) or "none detected"
+
+    # Attribution warning banner (shown only when needed)
+    if unattr:
+        attribution_html = (
+            '<div class="warn-box">'
+            "<strong>Attribution note:</strong> Gaming-related activity was detected but could not be "
+            "matched to the configured child device filter. Showing all active devices as fallback. "
+            "Check that CHILD_DEVICES in .env matches actual device names."
+            "</div>"
+        )
+    elif active == 0 and total > 0:
+        attribution_html = (
+            '<div class="warn-box">'
+            "<strong>Attribution note:</strong> Gaming-related DNS activity was detected, "
+            "but could not be attributed to any specific device. "
+            "Device name enrichment may not yet be applied to yesterday's logs."
+            "</div>"
+        )
+    else:
+        attribution_html = ""
+
+    # Per-device cards (mobile-friendly stacked layout)
+    device_cards = []
     for dev, hits in sorted(data["device_hits"].items(), key=lambda x: -x[1]):
-        blocked = data["device_blocked"].get(dev, 0)
-        note = make_note(dev, hits, blocked)
-        domains_str = ", ".join(
-            f"{d} ({c})"
-            for d, c in list(data["device_domain_counts"].get(dev, {}).items())
-        ) if data["device_domain_counts"].get(dev) else "—"
-        ent_overlap = data["entertainment_summary"] if hits > 0 else "—"
-        active_class = "" if hits > 0 else " class=\"inactive\""
-        device_rows.append(
-            f"<tr{active_class}>"
-            f"<td>{display_name(dev)}</td>"
-            f"<td>{hits}</td>"
-            f"<td>{blocked}</td>"
-            f"<td>{domains_str}</td>"
-            f"<td>{ent_overlap}</td>"
-            f"<td>{note}</td>"
-            f"</tr>"
+        dev_blocked = data["device_blocked"].get(dev, 0)
+        note = make_note(dev, hits, dev_blocked)
+        domains_html = ""
+        for d, c in list(data["device_domain_counts"].get(dev, {}).items()):
+            domains_html += f'<span class="domain-tag">{d} ({c})</span> '
+        if not domains_html:
+            domains_html = '<span class="muted">no domain data</span>'
+        pct_blocked = f"{int(dev_blocked/hits*100)}%" if hits > 0 else "0%"
+        alert_class = "card-alert" if (hits - dev_blocked) > 0 else "card-ok"
+        device_cards.append(
+            f'<div class="device-card {alert_class}">'
+            f'<div class="card-header">{display_name(dev)}</div>'
+            f'<div class="card-row"><span class="card-label">Gaming hits</span>'
+            f'<span class="card-value">{hits}</span></div>'
+            f'<div class="card-row"><span class="card-label">Blocked</span>'
+            f'<span class="card-value blocked-val">{dev_blocked} ({pct_blocked})</span></div>'
+            f'<div class="card-row"><span class="card-label">Top domains</span></div>'
+            f'<div class="domain-list">{domains_html}</div>'
+            f'<div class="card-note">{note}</div>'
+            f"</div>"
         )
 
-    # Evidence rows
-    evidence_rows = []
-    for ts, line in data["evidence_rows"][:10]:
-        parsed = parse_evidence_line(line)
-        evidence_rows.append(
-            f"<tr>"
-            f"<td>{ts_to_local(ts, tz)}</td>"
-            f"<td>{display_name(parsed['device'])}</td>"
-            f"<td>{parsed['domain']}</td>"
-            f"<td>{parsed['query_type']}</td>"
-            f"<td class=\"blocked\">{parsed['status']}</td>"
-            f"</tr>"
+    if not device_cards:
+        device_cards.append(
+            '<div class="device-card card-ok">'
+            '<div class="card-note muted">No gaming activity matched to any device.</div>'
+            "</div>"
         )
 
-    # Entertainment rows
-    ent_rows = []
-    for ts, line in data["entertainment_rows"][:8]:
-        parsed = parse_evidence_line(line)
-        status_cls = "blocked" if parsed["status"] == "BLOCKED" else "allowed"
-        ent_rows.append(
-            f"<tr>"
-            f"<td>{ts_to_local(ts, tz)}</td>"
-            f"<td>{display_name(parsed['device'])}</td>"
-            f"<td>{parsed['domain']}</td>"
-            f"<td>{parsed['query_type']}</td>"
-            f"<td class=\"{status_cls}\">{parsed['status']}</td>"
-            f"</tr>"
+    # Evidence items (mobile-friendly vertical layout)
+    evidence_items = []
+    for ts, line in data["evidence_rows"][:15]:
+        p = parse_log_line(line)
+        evidence_items.append(
+            '<div class="evidence-item">'
+            f'<div class="ev-row"><span class="ev-label">Time</span>'
+            f'<span class="ev-val">{ts_to_local(ts)}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Device</span>'
+            f'<span class="ev-val">{display_name(p["device"])}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Domain</span>'
+            f'<span class="ev-val domain-text">{p["domain"]}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Type</span>'
+            f'<span class="ev-val">{p["query_type"]}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Status</span>'
+            f'<span class="ev-val {p["status_class"]}">{p["status"].upper()}</span></div>'
+            "</div>"
+        )
+    if not evidence_items:
+        evidence_items.append(
+            '<div class="evidence-item muted-block">'
+            "No gaming DNS activity found in the report window."
+            "</div>"
+        )
+
+    # Entertainment items
+    ent_items = []
+    for ts, line in data["entertainment_rows"][:10]:
+        p = parse_log_line(line)
+        ent_items.append(
+            '<div class="evidence-item">'
+            f'<div class="ev-row"><span class="ev-label">Time</span>'
+            f'<span class="ev-val">{ts_to_local(ts)}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Device</span>'
+            f'<span class="ev-val">{display_name(p["device"])}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Domain</span>'
+            f'<span class="ev-val domain-text">{p["domain"]}</span></div>'
+            f'<div class="ev-row"><span class="ev-label">Status</span>'
+            f'<span class="ev-val {p["status_class"]}">{p["status"].upper()}</span></div>'
+            "</div>"
+        )
+    if not ent_items:
+        ent_items.append(
+            '<div class="evidence-item muted-block">'
+            "No entertainment DNS activity observed for active devices."
+            "</div>"
         )
 
     return {
-        "report_date": data["report_date"],
-        "active_device_count": data["active_device_count"],
-        "total_hits": data["total_hits"],
-        "total_blocked": data["total_blocked"],
+        "report_date":         data["report_date"],
+        "active_device_count": active,
+        "total_hits":          total_display,
+        "total_blocked":       blocked_display,
         "top_domains_summary": top_str,
-        "device_rows_html": "".join(device_rows) if device_rows else (
-            '<tr><td colspan="6" class="no-activity">'
-            "No configured child devices had gaming-related activity today."
-            "</td></tr>"
-        ),
-        "evidence_rows_html": "".join(evidence_rows) if evidence_rows else (
-            '<tr><td colspan="5" class="no-activity">'
-            "No blocked gaming evidence in the past 24 hours."
-            "</td></tr>"
-        ),
-        "ent_rows_html": "".join(ent_rows) if ent_rows else (
-            '<tr><td colspan="5" class="no-activity">'
-            "No entertainment-related DNS activity observed for child devices today."
-            "</td></tr>"
-        ),
-        "conclusion": make_conclusion(data),
+        "attribution_html":    attribution_html,
+        "device_cards_html":   "\n".join(device_cards),
+        "evidence_items_html": "\n".join(evidence_items),
+        "ent_items_html":      "\n".join(ent_items),
+        "conclusion":          make_conclusion(data),
     }
 
 
 def render_html(data: dict) -> str:
-    template = _load_template()
-    return template.substitute(_build_rows(data))
+    return _load_template().substitute(_build_substitutions(data))
 
 
 def render_text(data: dict) -> str:
-    tz = REPORT_TIMEZONE
-    report_date = data["report_date"]
-    top_str = ", ".join(f"{d} ({c})" for d, c in data["top_domains"].items()) if data["top_domains"] else "none"
-    conclusion = make_conclusion(data)
+    total   = data["total_hits"]
+    blocked = data["total_blocked"]
+    top_str = ", ".join(f"{d} ({c})" for d, c in data["top_domains"].items()) or "none"
 
     lines = [
-        f"Home network gaming report — {report_date}",
+        f"Home network gaming report — {data['report_date']}",
         "=" * 50,
         "",
         "SUMMARY",
-        f"  Devices with gaming-related activity: {data['active_device_count']}",
-        f"  Total gaming DNS hits:             {data['total_hits']}",
-        f"  Blocked gaming DNS hits:            {data['total_blocked']}",
-        f"  Top gaming domains:                 {top_str}",
+        f"  Devices with gaming activity : {data['active_device_count']}",
+        f"  Total gaming DNS hits        : {total if total >= 0 else 'unknown'}",
+        f"  Blocked gaming DNS hits      : {blocked if blocked >= 0 else 'unknown'}",
+        f"  Top gaming domains           : {top_str}",
         "",
-        "PER DEVICE",
     ]
 
+    if data.get("unattributed"):
+        lines.append("  WARNING: No devices matched CHILD_DEVICES filter — showing all devices as fallback.")
+        lines.append("")
+
+    lines.append("PER DEVICE")
     for dev, hits in sorted(data["device_hits"].items(), key=lambda x: -x[1]):
-        blocked = data["device_blocked"].get(dev, 0)
-        note = make_note(dev, hits, blocked)
+        dev_blocked = data["device_blocked"].get(dev, 0)
         domains_str = ", ".join(
             f"{d} ({c})" for d, c in list(data["device_domain_counts"].get(dev, {}).items())
         ) or "—"
-        ent = data["entertainment_summary"] if hits > 0 else "—"
-        lines.append(f"  {dev}")
-        lines.append(f"    Gaming hits: {hits}  |  Blocked: {blocked}")
-        lines.append(f"    Top domains: {domains_str}")
-        lines.append(f"    Entertainment: {ent}")
-        lines.append(f"    Note: {note}")
-        lines.append("")
+        lines += [
+            f"  {display_name(dev)}",
+            f"    Gaming hits : {hits}  |  Blocked : {dev_blocked}",
+            f"    Top domains : {domains_str}",
+            f"    Note        : {make_note(dev, hits, dev_blocked)}",
+            "",
+        ]
 
-    lines.extend([
-        "RECENT BLOCKED GAMING EVIDENCE",
-    ])
+    lines.append("RECENT GAMING EVIDENCE")
     if data["evidence_rows"]:
-        for ts, line in data["evidence_rows"][:10]:
-            parsed = parse_evidence_line(line)
+        for ts, line in data["evidence_rows"][:15]:
+            p = parse_log_line(line)
             lines.append(
-                f"  {ts_to_local(ts, tz)}  |  {parsed['device']}  |  "
-                f"{parsed['domain']}  |  {parsed['query_type']}  |  BLOCKED"
+                f"  {ts_to_local(ts)}  {display_name(p['device'])}  "
+                f"{p['domain']}  [{p['query_type']}]  {p['status'].upper()}"
             )
     else:
-        lines.append("  No blocked gaming evidence in the past 24 hours.")
+        lines.append("  No gaming evidence in the report window.")
 
-    lines.extend(["", "RECENT ENTERTAINMENT CONTEXT"])
+    lines += ["", "RECENT ENTERTAINMENT CONTEXT"]
     if data["entertainment_rows"]:
-        for ts, line in data["entertainment_rows"][:8]:
-            parsed = parse_evidence_line(line)
+        for ts, line in data["entertainment_rows"][:10]:
+            p = parse_log_line(line)
             lines.append(
-                f"  {ts_to_local(ts, tz)}  |  {parsed['device']}  |  "
-                f"{parsed['domain']}  |  {parsed['query_type']}  |  {parsed['status']}"
+                f"  {ts_to_local(ts)}  {display_name(p['device'])}  "
+                f"{p['domain']}  [{p['query_type']}]  {p['status'].upper()}"
             )
     else:
-        lines.append("  No entertainment-related DNS activity observed for child devices today.")
+        lines.append("  No entertainment activity for active devices.")
 
-    lines.extend([
+    lines += [
         "",
         "CONCLUSION",
-        f"  {conclusion}",
+        f"  {make_conclusion(data)}",
         "",
         "NOTES",
-        "  - This report is based on DNS and network activity evidence.",
-        "  - It can strongly suggest gaming-related behaviour, but it is not proof of exact gameplay duration.",
-        "  - Repeated hits to Roblox, bloxd.io, and similar domains are stronger indicators than isolated single requests.",
-        "  - Blocked gaming DNS requests indicate that parental controls are working as configured.",
-    ])
-
+        "  DNS evidence strongly suggests gaming-related behaviour but does not prove gameplay duration.",
+        "  Repeated hits to Roblox, bloxd.io, and similar — especially in sustained bursts — are stronger indicators.",
+        "  Blocked gaming DNS requests indicate parental controls are working.",
+    ]
     return "\n".join(lines)
 
 
@@ -610,36 +669,28 @@ def send_email(html_body: str, text_body: str, report_date: str):
     from email.mime.text import MIMEText
 
     if not all([SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM, SMTP_TO]):
-        raise RuntimeError(
-            "SMTP config incomplete: check SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, "
-            "SMTP_FROM, SMTP_TO in .env"
-        )
+        raise RuntimeError("SMTP config incomplete — check SMTP_HOST/USERNAME/PASSWORD/FROM/TO in .env")
 
     recipients = [r.strip() for r in SMTP_TO.split(",") if r.strip()]
-    subject = f"Home network gaming report — {report_date}"
+    subject    = f"Home network gaming report — {report_date}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = SMTP_FROM
-    msg["To"] = ", ".join(recipients)
-
-    part_text = MIMEText(text_body, "plain", "utf-8")
-    part_html = MIMEText(html_body, "html", "utf-8")
-    msg.attach(part_text)
-    msg.attach(part_html)
+    msg["From"]    = SMTP_FROM
+    msg["To"]      = ", ".join(recipients)
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html",  "utf-8"))
 
     log.info("Connecting to SMTP %s:%d...", SMTP_HOST, SMTP_PORT)
     if SMTP_USE_TLS:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM, recipients, msg.as_string())
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+            s.ehlo(); s.starttls(); s.ehlo()
+            s.login(SMTP_USERNAME, SMTP_PASSWORD)
+            s.sendmail(SMTP_FROM, recipients, msg.as_string())
     else:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM, recipients, msg.as_string())
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+            s.login(SMTP_USERNAME, SMTP_PASSWORD)
+            s.sendmail(SMTP_FROM, recipients, msg.as_string())
 
     log.info("Report sent to %s", recipients)
 
@@ -654,28 +705,31 @@ def main():
         sys.exit(1)
 
     loki = LokiClient(LOKI_URL)
-
-    # Verify Loki is reachable
     try:
-        loki.query("count_over_time({job=\"adguard\"}[1m]) > 0")
+        # Smoke test
+        loki.metric_instant('count_over_time({job="adguard"}[1m])', at_ns=int(datetime.now(timezone.utc).timestamp()*1e9))
         log.info("Loki connection OK")
     except Exception as e:
         log.error("Cannot connect to Loki at %s: %s", LOKI_URL, e)
         sys.exit(2)
 
-    log.info("Fetching report data from Loki...")
+    log.info("Fetching report data...")
     try:
         data = fetch_report_data(loki)
     except Exception as e:
         log.error("Data fetch failed: %s", e)
         sys.exit(3)
 
-    log.info("Rendering report...")
+    log.info(
+        "Data: total_hits=%s blocked=%s devices=%d unattributed=%s",
+        data["total_hits"], data["total_blocked"],
+        data["active_device_count"], data.get("unattributed"),
+    )
+
     html = render_html(data)
     text = render_text(data)
 
     if SMTP_HOST:
-        log.info("Sending email...")
         try:
             send_email(html, text, data["report_date"])
             log.info("Report sent successfully")
@@ -683,8 +737,7 @@ def main():
             log.error("Email send failed: %s", e)
             sys.exit(4)
     else:
-        # No SMTP configured — write report to stdout
-        log.warning("SMTP not configured; printing report to stdout")
+        log.warning("SMTP not configured — printing to stdout")
         print(text)
 
     log.info("Done")
