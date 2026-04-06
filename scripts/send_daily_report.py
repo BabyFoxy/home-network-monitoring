@@ -190,177 +190,133 @@ class LokiClient:
         rows.sort(key=lambda r: r[0], reverse=True)  # newest first
         return rows
 
-    def query_instant(self, expr: str, time_ns: int = None) -> dict:
-        """Instant query evaluated at an explicit UTC nanosecond timestamp."""
-        if time_ns is None:
-            time_ns = int(datetime.now(timezone.utc).timestamp() * 1e9)
-        log.debug("Loki instant query at ns=%s: %s", int(time_ns), expr[:120])
-        payload = f"query={urllib.parse.quote(expr)}&time={time_ns}".encode()
-        try:
-            req = urllib.request.Request(
-                f"{self.base}/loki/api/v1/query",
-                data=payload,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                return self._strip_json_prefix(resp.read())
-        except urllib.error.HTTPError as e:
-            body = e.read()[:500]
-            raise RuntimeError(f"Loki HTTP {e.code}: {body}") from e
-        except Exception as e:
-            raise RuntimeError(f"Loki request failed: {e}") from e
 
+# ── Data fetching ────────────────────────────────────────────────────────────────
 
-# ── Data fetching ──────────────────────────────────────────────────────────────
 
 def fetch_report_data(loki: LokiClient) -> dict:
     gaming = GAMING_PATTERNS
     entertainment = ENTERTAINMENT_PATTERNS
     child_re = CHILD_DEVICES or "."
 
-    # ── Timezone-aware report date and query window ──────────────────────────
-    # The report covers the previous full calendar day in the system timezone.
-    # Note: Loki 3.x does not reliably handle instant queries with `time` in the
-    # past (connection dropped). We anchor all instant queries to "now" and use
-    # [24h] as the window — acceptable for a 07:00 daily report (covers
-    # ~midnight–07:00 Sydney the previous day with minor edge-case bleed).
-    local_now = _local_now()
+    # ── Single consistent Sydney-local report window ───────────────────────────
+    # Report covers the previous full calendar day in the system timezone.
+    local_now      = _local_now()
     local_yesterday = local_now.date() - timedelta(days=1)
-    report_date = local_yesterday.strftime("%Y-%m-%d")
+    report_date    = local_yesterday.strftime("%Y-%m-%d")
 
-    # For evidence rows (query_range), use midnight→now in UTC
-    midnight_start = _midnight_local(local_yesterday)
-    midnight_end   = _midnight_local(local_now.date())
-    query_start_ns = _to_utc_ns(midnight_start)
-    query_end_ns   = _to_utc_ns(midnight_end)  # used only for query_range
+    # Exact UTC nanosecond bounds for the Sydney midnight→midnight window
+    midnight_start = _midnight_local(local_yesterday)   # midnight of yesterday (local)
+    midnight_end   = _midnight_local(local_now.date())    # midnight of today (local)
+    start_ns = _to_utc_ns(midnight_start)
+    end_ns   = _to_utc_ns(midnight_end)
 
-    log.info("Building report for %s (previous local calendar day)", report_date)
+    log.info("Report for %s  window: %s → %s (Sydney local)",
+             report_date, midnight_start, midnight_end)
 
-    # 1. Per-device gaming hit counts
-    q_device_hits = (
-        "sum by (client_name) (count_over_time("
-        "{{job=\"adguard\", client_name=~\"{child_re}\"}}"
-        " |~ \"{gaming}\" [24h]))"
-    ).format(child_re=child_re, gaming=gaming)
+    # ── Fetch all gaming entries for the day in one query per filter ──────────
+    # Evidence rows: need raw entries (limit 15)
     try:
-        result = loki.query_instant(q_device_hits)
-        device_hits = {}
-        for s in result.get("data", {}).get("result", []):
-            name = s["metric"].get("client_name", "?")
-            device_hits[name] = int(float(s["value"][1]))
-    except Exception as e:
-        log.error("Failed to fetch per-device gaming hits: %s", e)
-        device_hits = {}
-
-    # 2. Per-device blocked gaming hits
-    q_blocked = (
-        "sum by (client_name) (count_over_time("
-        "{{job=\"adguard\", client_name=~\"{child_re}\", reason=~\"[3-9]\"}}"
-        " |~ \"{gaming}\" [24h]))"
-    ).format(child_re=child_re, gaming=gaming)
-    try:
-        result = loki.query_instant(q_blocked)
-        device_blocked = {}
-        for s in result.get("data", {}).get("result", []):
-            name = s["metric"].get("client_name", "?")
-            device_blocked[name] = int(float(s["value"][1]))
-    except Exception as e:
-        log.error("Failed to fetch per-device blocked hits: %s", e)
-        device_blocked = {}
-
-    # 3. Top gaming domains (all devices, 24h)
-    q_domains = (
-        "sum by (domain) (count_over_time("
-        "{{job=\"adguard\"}}"
-        " |~ \"{gaming}\""
-        " | regexp \"-> (?P<domain>[^ ]+)\" [24h]))"
-    ).format(gaming=gaming)
-    try:
-        result = loki.query_instant(q_domains)
-        domain_counts = {}
-        for s in result.get("data", {}).get("result", []):
-            d = s["metric"].get("domain", "?")
-            domain_counts[d] = int(float(s["value"][1]))
-        top_domains = dict(sorted(domain_counts.items(), key=lambda x: -x[1])[:10])
-    except Exception as e:
-        log.error("Failed to fetch top gaming domains: %s", e)
-        top_domains = {}
-
-    # 4. Active devices (for entertainment filtering)
-    active_devices = [d for d, hits in device_hits.items() if hits > 0]
-    active_devices_re = "|".join(re.escape(d) for d in active_devices) if active_devices else "NODEVICES"
-
-    # 5. Per-device top domains
-    device_domain_counts = {}
-    for dev in active_devices:
-        q = (
-            "sum by (domain) (count_over_time("
-            "{{job=\"adguard\", client_name=\"{dev}\"}}"
-            " |~ \"{gaming}\""
-            " | regexp \"-> (?P<domain>[^ ]+)\" [24h]))"
-        ).format(dev=dev, gaming=gaming)
-        try:
-            result = loki.query_instant(q)
-            counts = {}
-            for s in result.get("data", {}).get("result", []):
-                d = s["metric"].get("domain", "?")
-                counts[d] = int(float(s["value"][1]))
-            device_domain_counts[dev] = dict(sorted(counts.items(), key=lambda x: -x[1])[:5])
-        except Exception as e:
-            log.warning("Failed to fetch domains for %s: %s", dev, e)
-            device_domain_counts[dev] = {}
-
-    # 6. Total blocked gaming hits
-    q_total_blocked = (
-        "sum(count_over_time("
-        "{{job=\"adguard\", reason=~\"[3-9]\"}}"
-        " |~ \"{gaming}\" [24h]))"
-    ).format(gaming=gaming)
-    try:
-        result = loki.query_instant(q_total_blocked)
-        total_blocked = int(float(result["data"]["result"][0]["value"][1]))
-    except Exception:
-        total_blocked = 0
-
-    # 7. Total gaming hits
-    q_total = (
-        "sum(count_over_time("
-        "{{job=\"adguard\"}}"
-        " |~ \"{gaming}\" [24h]))"
-    ).format(gaming=gaming)
-    try:
-        result = loki.query_instant(q_total)
-        total_hits = int(float(result["data"]["result"][0]["value"][1]))
-    except Exception:
-        total_hits = 0
-
-    # 8. Recent blocked gaming evidence (within the report window)
-    q_evidence = (
-        "{{job=\"adguard\", reason=~\"[3-9]\"}}"
-        " |~ \"{gaming}\""
-        " | regexp \"-> (?P<domain>[^ ]+)\""
-    ).format(gaming=gaming)
-    try:
-        evidence_rows = loki.query_range(
-            q_evidence, limit=15,
-            start_ns=query_start_ns, end_ns=query_end_ns,
+        raw_evidence = loki.query_range(
+            f'{{job="adguard", reason=~"[3-9]"}}'
+            f' |~ "{gaming}"'
+            f' | regexp "-> (?P<domain>[^ ]+)"',
+            limit=15, start_ns=start_ns, end_ns=end_ns,
         )
     except Exception as e:
         log.warning("Failed to fetch blocked evidence: %s", e)
-        evidence_rows = []
+        raw_evidence = []
 
-    # 9. Recent entertainment (active devices only, within the report window)
+    # Per-device: need all entries (no limit) filtered to child devices
+    try:
+        raw_device = loki.query_range(
+            f'{{job="adguard", client_name=~"{child_re}"}}'
+            f' |~ "{gaming}"',
+            start_ns=start_ns, end_ns=end_ns,
+        )
+    except Exception as e:
+        log.warning("Failed to fetch device gaming entries: %s", e)
+        raw_device = []
+
+    # Per-device blocked entries
+    try:
+        raw_blocked = loki.query_range(
+            f'{{job="adguard", client_name=~"{child_re}", reason=~"[3-9]"}}'
+            f' |~ "{gaming}"',
+            start_ns=start_ns, end_ns=end_ns,
+        )
+    except Exception as e:
+        log.warning("Failed to fetch device blocked entries: %s", e)
+        raw_blocked = []
+
+    # All gaming entries (for global totals and top domains)
+    try:
+        raw_all = loki.query_range(
+            f'{{job="adguard"}}'
+            f' |~ "{gaming}"'
+            f' | regexp "-> (?P<domain>[^ ]+)"',
+            start_ns=start_ns, end_ns=end_ns,
+        )
+    except Exception as e:
+        log.warning("Failed to fetch all gaming entries: %s", e)
+        raw_all = []
+
+    # ── Aggregate in Python ───────────────────────────────────────────────────
+    # Per-device gaming hit counts
+    device_hits = {}
+    for _, line in raw_device:
+        m = re.search(r"^([^ ]+)", line)
+        if m:
+            dev = m.group(1)
+            device_hits[dev] = device_hits.get(dev, 0) + 1
+
+    # Per-device blocked counts
+    device_blocked = {}
+    for _, line in raw_blocked:
+        m = re.search(r"^([^ ]+)", line)
+        if m:
+            device_blocked[m.group(1)] = device_blocked.get(m.group(1), 0) + 1
+
+    # Total counts
+    total_hits    = len(raw_all)
+    total_blocked = sum(1 for _, line in raw_blocked)
+
+    # Top domains (all devices)
+    domain_counts = {}
+    for _, line in raw_all:
+        m = re.search(r"-> ([^ ]+)", line)
+        if m:
+            domain_counts[m.group(1)] = domain_counts.get(m.group(1), 0) + 1
+    top_domains = dict(sorted(domain_counts.items(), key=lambda x: -x[1])[:10])
+
+    # Per-device top domains
+    # Build per-device line lists from raw_all (already has domain)
+    dev_domains: dict = {}
+    for _, line in raw_all:
+        dev_m = re.search(r"^([^ ]+)", line)
+        dom_m = re.search(r"-> ([^ ]+)", line)
+        if dev_m and dom_m:
+            dev_domains.setdefault(dev_m.group(1), []).append(dom_m.group(1))
+
+    device_domain_counts = {}
+    for dev, domains in dev_domains.items():
+        counts = {}
+        for d in domains:
+            counts[d] = counts.get(d, 0) + 1
+        device_domain_counts[dev] = dict(sorted(counts.items(), key=lambda x: -x[1])[:5])
+
+    # Active devices (those with any gaming activity)
+    active_devices = [d for d, hits in device_hits.items() if hits > 0]
+    active_devices_re = "|".join(re.escape(d) for d in active_devices) if active_devices else "NODEVICES"
+
+    # Entertainment rows (active devices only)
     if active_devices_re != "NODEVICES":
-        q_ent = (
-            "{{job=\"adguard\", client_name=~\"{dev_re}\"}}"
-            " |~ \"{entertainment}\""
-            " | regexp \"-> (?P<domain>[^ ]+)\""
-        ).format(dev_re=active_devices_re, entertainment=entertainment)
         try:
             entertainment_rows = loki.query_range(
-                q_ent, limit=10,
-                start_ns=query_start_ns, end_ns=query_end_ns,
+                f'{{job="adguard", client_name=~"{active_devices_re}"}}'
+                f' |~ "{entertainment}"'
+                f' | regexp "-> (?P<domain>[^ ]+)"',
+                limit=10, start_ns=start_ns, end_ns=end_ns,
             )
         except Exception as e:
             log.warning("Failed to fetch entertainment context: %s", e)
@@ -368,7 +324,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
     else:
         entertainment_rows = []
 
-    # 10. Entertainment domain set for conclusion
+    # Entertainment domain set for conclusion
     entertainment_domains = set()
     for _, line in entertainment_rows:
         m = re.search(r"-> ([^ ]+)", line)
@@ -377,16 +333,16 @@ def fetch_report_data(loki: LokiClient) -> dict:
     entertainment_summary = ", ".join(sorted(entertainment_domains)) if entertainment_domains else "none observed"
 
     return {
-        "report_date": report_date,
-        "active_device_count": len(active_devices),
-        "total_hits": total_hits,
-        "total_blocked": total_blocked,
-        "device_hits": device_hits,
-        "device_blocked": device_blocked,
-        "device_domain_counts": device_domain_counts,
-        "top_domains": top_domains,
-        "evidence_rows": evidence_rows,
-        "entertainment_rows": entertainment_rows,
+        "report_date":          report_date,
+        "active_device_count":  len(active_devices),
+        "total_hits":           total_hits,
+        "total_blocked":        total_blocked,
+        "device_hits":          device_hits,
+        "device_blocked":       device_blocked,
+        "device_domain_counts":  device_domain_counts,
+        "top_domains":          top_domains,
+        "evidence_rows":        raw_evidence,
+        "entertainment_rows":   entertainment_rows,
         "entertainment_summary": entertainment_summary,
     }
 
