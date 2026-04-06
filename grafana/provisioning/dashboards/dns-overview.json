@@ -521,106 +521,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "labels"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Line"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tsNs"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labelTypes"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "id"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Status"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Status"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "BLOCKED": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "ALLOWED": {
-                        "text": "ALLOWED",
-                        "color": "green"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "device"
             },
             "properties": [
@@ -669,7 +569,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "status"
+              "options": "reason"
             },
             "properties": [
               {
@@ -679,12 +579,270 @@
               {
                 "id": "custom.hidden",
                 "value": false
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Allowed",
+                        "color": "green"
+                      },
+                      "1": {
+                        "text": "Allowed",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "Allowed",
+                        "color": "green"
+                      },
+                      "3": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "4": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "5": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "6": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "7": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "8": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "9": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      },
+                      "10": {
+                        "text": "BLOCKED",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Line"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "labels"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "labelTypes"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tsNs"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Num"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "client"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "job"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "filename"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "service_name"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "detected_level"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "category"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "client_name"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
               }
             ]
           }
         ]
       },
       "transforms": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "fields": {
+              "client_name": {},
+              "query_type": {},
+              "reason": {},
+              "category": {}
+            },
+            "replace": false
+          }
+        },
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "Line",
+            "replace": false,
+            "parse": {
+              "type": "regex",
+              "expression": "^(?P<device>[^ ]+) \u2192 (?P<domain>[^ ]+) \\[[^\\]]+\\] \u2014 [^ ]+$"
+            }
+          }
+        },
         {
           "id": "organizeFields",
           "options": {
@@ -693,6 +851,7 @@
               "labels": true,
               "labelTypes": true,
               "id": true,
+              "tsNs": true,
               "Num": true,
               "client": true,
               "job": true,
@@ -701,7 +860,7 @@
               "service_name": true,
               "detected_level": true,
               "category": true,
-              "reason": true,
+              "client_name": true,
               "status": true
             },
             "indexByName": {
@@ -709,13 +868,13 @@
               "device": 1,
               "domain": 2,
               "query_type": 3,
-              "status": 4
+              "reason": 4
             },
             "renameByName": {
               "device": "Device",
               "domain": "Domain",
               "query_type": "Query Type",
-              "status": "Status"
+              "reason": "Status"
             }
           }
         },
@@ -729,35 +888,14 @@
       ],
       "targets": [
         {
-          "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\" | regexp \"-> (?P<domain>[^ ]+)\"",
+          "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "P8E80F9AEF21F6940"
           },
-          "derivedFields": [
-            {
-              "name": "Device",
-              "matcherRegex": "^(?P<device>[^ ]+)",
-              "type": "string"
-            },
-            {
-              "name": "Domain",
-              "matcherRegex": "\u2192 (?P<domain>[^ ]+)",
-              "type": "string"
-            },
-            {
-              "name": "Query Type",
-              "matcherRegex": "\\[(?P<query_type>[^\\]]+)\\]",
-              "type": "string"
-            },
-            {
-              "name": "Status",
-              "matcherRegex": "\u2014 (?P<status>[A-Z]+)",
-              "type": "string"
-            }
-          ]
+          "derivedFields": []
         }
       ],
       "transformations": []
@@ -819,106 +957,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "labels"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Line"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tsNs"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labelTypes"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "id"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Status"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Status"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-background"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "BLOCKED": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "ALLOWED": {
-                        "text": "ALLOWED",
-                        "color": "green"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "device"
             },
             "properties": [
@@ -963,10 +1001,226 @@
                 "value": false
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Line"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "labels"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "labelTypes"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tsNs"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Num"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "client"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "job"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "source"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "filename"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "service_name"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "detected_level"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "category"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "client_name"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reason"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
           }
         ]
       },
       "transforms": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "fields": {
+              "client_name": {},
+              "query_type": {},
+              "reason": {},
+              "category": {}
+            },
+            "replace": false
+          }
+        },
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "Line",
+            "replace": false,
+            "parse": {
+              "type": "regex",
+              "expression": "^(?P<device>[^ ]+) \u2192 (?P<domain>[^ ]+) [^ ]+$"
+            }
+          }
+        },
         {
           "id": "organizeFields",
           "options": {
@@ -975,6 +1229,7 @@
               "labels": true,
               "labelTypes": true,
               "id": true,
+              "tsNs": true,
               "Num": true,
               "client": true,
               "job": true,
@@ -983,6 +1238,7 @@
               "service_name": true,
               "detected_level": true,
               "category": true,
+              "client_name": true,
               "reason": true,
               "status": true
             },
@@ -995,38 +1251,21 @@
             "renameByName": {
               "device": "Device",
               "domain": "Domain",
-              "query_type": "Query Type",
-              "status": "Status"
+              "query_type": "Query Type"
             }
           }
         }
       ],
       "targets": [
         {
-          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\" | regexp \"-> (?P<domain>[^ ]+)\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A",
           "datasource": {
             "type": "loki",
             "uid": "P8E80F9AEF21F6940"
           },
-          "derivedFields": [
-            {
-              "name": "Device",
-              "matcherRegex": "^(?P<device>[^ ]+)",
-              "type": "string"
-            },
-            {
-              "name": "Domain",
-              "matcherRegex": "\u2192 (?P<domain>[^ ]+)",
-              "type": "string"
-            },
-            {
-              "name": "Query Type",
-              "matcherRegex": "\\[(?P<query_type>[^\\]]+)\\]",
-              "type": "string"
-            }
-          ]
+          "derivedFields": []
         }
       ],
       "transformations": []
