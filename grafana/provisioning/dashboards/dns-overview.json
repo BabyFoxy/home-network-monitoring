@@ -1,8 +1,8 @@
 {
-  "title": "DNS \u2014 Parental Review",
+  "title": "DNS — Parental Review",
   "uid": "dns-log-viz-v1",
   "schemaVersion": 39,
-  "version": 6,
+  "version": 7,
   "refresh": "5m",
   "time": {
     "from": "now-24h",
@@ -301,7 +301,7 @@
     },
     {
       "id": 3,
-      "title": "Gaming Activity Timeline  (zoom time range to study hours e.g. 3pm\u20137pm)",
+      "title": "Gaming Activity Timeline  (zoom time range to study hours e.g. 3pm–7pm)",
       "description": "Set the time range to study hours to see gaming during homework time. Each spike = cluster of gaming DNS queries in a 5-min window.",
       "type": "timeseries",
       "gridPos": {
@@ -337,13 +337,13 @@
       "targets": [
         {
           "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" [5m]))",
-          "legendFormat": "\ud83c\udfae {{client_name}}",
+          "legendFormat": "🎮 {{client_name}}",
           "queryType": "range",
           "refId": "A"
         },
         {
           "expr": "sum by (client_name) (count_over_time({job=\"adguard\", client_name=~\"$client_name\"} |~ \"youtube[.]com|ytimg[.]com|googlevideo[.]com|discord[.]com|discord[.]gg|twitch[.]tv\" [5m]))",
-          "legendFormat": "\ud83d\udcfa {{client_name}} (entertainment)",
+          "legendFormat": "📺 {{client_name}} (entertainment)",
           "queryType": "range",
           "refId": "B"
         }
@@ -351,7 +351,7 @@
     },
     {
       "id": 4,
-      "title": "Burst Detection  (gaming DNS hits per 5-min window \u2014 sustained spikes suggest active play)",
+      "title": "Burst Detection  (gaming DNS hits per 5-min window — sustained spikes suggest active play)",
       "description": "10+ gaming DNS hits in a 5-minute window is a strong indicator of an active game session. Orange = moderate, Red = high.",
       "type": "timeseries",
       "gridPos": {
@@ -468,7 +468,7 @@
       "id": 6,
       "title": "Blocked Gaming Evidence  (24h, newest first)",
       "description": "Blocked gaming-related DNS queries in the past 24 hours. Each row = one blocked lookup. Use Domain filter to narrow results.",
-      "type": "table",
+      "type": "logs",
       "gridPos": {
         "x": 0,
         "y": 23,
@@ -480,343 +480,12 @@
         "uid": "P8E80F9AEF21F6940"
       },
       "options": {
-        "showHeader": true,
-        "footer": {
-          "show": false
-        },
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Time"
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "text"
-            }
-          },
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "unit",
-                "value": "time:YYYY-MM-DD HH:mm:ss"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "device"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Device"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "domain"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Domain"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "query_type"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Query Type"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "reason"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Status"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "0": {
-                        "text": "Allowed",
-                        "color": "green"
-                      },
-                      "1": {
-                        "text": "Allowed",
-                        "color": "green"
-                      },
-                      "2": {
-                        "text": "Allowed",
-                        "color": "green"
-                      },
-                      "3": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "4": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "5": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "6": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "7": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "8": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "9": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      },
-                      "10": {
-                        "text": "BLOCKED",
-                        "color": "red"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Line"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labels"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labelTypes"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "id"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tsNs"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Num"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "client"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "job"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "source"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "filename"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "service_name"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "detected_level"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "category"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "client_name"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "status"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
       },
       "transforms": [
         {
@@ -839,7 +508,7 @@
             "replace": false,
             "parse": {
               "type": "regex",
-              "expression": "^(?P<device>[^ ]+) \u2192 (?P<domain>[^ ]+) \\[[^\\]]+\\] \u2014 [^ ]+$"
+              "expression": "^(?P<device>[^ ]+) → (?P<domain>[^ ]+) \\[[^\\]]+\\] — [^ ]+$"
             }
           }
         },
@@ -902,9 +571,9 @@
     },
     {
       "id": 7,
-      "title": "Entertainment Activity  (YouTube / Discord / Twitch \u2014 compare timing with gaming above)",
+      "title": "Entertainment Activity  (YouTube / Discord / Twitch — compare timing with gaming above)",
       "description": "Entertainment DNS queries from selected devices in the past 24 hours. Each row = one lookup. Red = blocked, green = allowed. Compare timing with gaming activity above.",
-      "type": "table",
+      "type": "logs",
       "gridPos": {
         "x": 0,
         "y": 33,
@@ -916,285 +585,12 @@
         "uid": "P8E80F9AEF21F6940"
       },
       "options": {
-        "showHeader": true,
-        "footer": {
-          "show": false
-        },
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Time"
-          }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "text"
-            }
-          },
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "unit",
-                "value": "time:YYYY-MM-DD HH:mm:ss"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "device"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Device"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "domain"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Domain"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "query_type"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Query Type"
-              },
-              {
-                "id": "custom.hidden",
-                "value": false
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Line"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labels"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labelTypes"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "id"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "tsNs"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Num"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "client"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "job"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "source"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "filename"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "service_name"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "detected_level"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "category"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "client_name"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "status"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "reason"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "signature"
       },
       "transforms": [
         {
@@ -1217,7 +613,7 @@
             "replace": false,
             "parse": {
               "type": "regex",
-              "expression": "^(?P<device>[^ ]+) \u2192 (?P<domain>[^ ]+) [^ ]+$"
+              "expression": "^(?P<device>[^ ]+) → (?P<domain>[^ ]+) [^ ]+$"
             }
           }
         },
