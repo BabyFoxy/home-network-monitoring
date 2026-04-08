@@ -72,13 +72,14 @@ SMTP_PASSWORD  = _env("SMTP_PASSWORD", "")
 SMTP_FROM      = _env("SMTP_FROM", "")
 SMTP_TO        = _env("SMTP_TO", "")
 SMTP_USE_TLS   = _env("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
-# Fox Devices IPs to exclude (from AdGuard Fox Devices group)
-FOX_DEVICE_IPS = {"192.168.1.1","192.168.1.3","192.168.1.5","192.168.1.6",
-                   "192.168.1.14","192.168.1.16","192.168.1.17","192.168.1.101",
-                   "192.168.1.250","192.168.1.251"}
-CHILD_DEVICES  = _env("CHILD_DEVICES",
-    "Elissa PC|Ethan MBP|Ethan PC|EthanR-PC|MBP-S26226|David iPhone"
-)   # regex matching client_name labels; override in .env
+# Devices to EXCLUDE from monitoring (Fox Devices group + David iPhone)
+# Override in .env as pipe-separated IPs/names: EXCLUDE_DEVICES=192.168.1.1|192.168.1.3|...
+_DEFAULT_EXCLUDE = (
+    "192[.]168[.]1[.]1$|192[.]168[.]1[.]3|192[.]168[.]1[.]5$|192[.]168[.]1[.]6$|"
+    "192[.]168[.]1[.]14$|192[.]168[.]1[.]16$|192[.]168[.]1[.]17$|192[.]168[.]1[.]18$|"
+    "192[.]168[.]1[.]101$|192[.]168[.]1[.]250$|192[.]168[.]1[.]251$"
+)
+EXCLUDE_DEVICES = _env("EXCLUDE_DEVICES", _DEFAULT_EXCLUDE)
 
 _DEVICE_DISPLAY_RAW = _env("DEVICE_DISPLAY_NAMES", "")
 DEVICE_DISPLAY_NAMES: dict = {}
@@ -183,7 +184,7 @@ class LokiClient:
 def fetch_report_data(loki: LokiClient) -> dict:
     gaming        = GAMING_PATTERNS
     entertainment = ENTERTAINMENT_PATTERNS
-    child_re      = CHILD_DEVICES if CHILD_DEVICES else ".+"
+    exclude_re    = EXCLUDE_DEVICES
 
     local_now       = _local_now()
     report_date     = (local_now - timedelta(hours=24)).strftime("%Y-%m-%d")
@@ -232,19 +233,8 @@ def fetch_report_data(loki: LokiClient) -> dict:
         device_hits_all = {}
 
     # Filter to child devices if configured; fall back to all if nothing matches.
-    device_hits = {d: h for d, h in device_hits_all.items() if re.search(child_re, d)}
-    child_filter_active = bool(CHILD_DEVICES)
+    device_hits = {d: h for d, h in device_hits_all.items() if not re.search(exclude_re, d)}
     unattributed = False
-    if child_filter_active and not device_hits and device_hits_all:
-        # Gaming activity exists but none matched CHILD_DEVICES regex.
-        # Use all devices so the report is not silently empty.
-        device_hits  = device_hits_all
-        unattributed = True
-        log.warning(
-            "CHILD_DEVICES regex %r matched no active device names %s — "
-            "reporting all devices as fallback",
-            child_re, list(device_hits_all.keys()),
-        )
 
     # ── Per-device blocked counts ────────────────────────────────────────────────
     try:
@@ -342,7 +332,6 @@ def fetch_report_data(loki: LokiClient) -> dict:
         "entertainment_rows":    entertainment_rows,
         "entertainment_summary": entertainment_summary,
         "unattributed":          unattributed,
-        "child_filter_active":   child_filter_active,
     }
 
 
@@ -385,9 +374,9 @@ def make_conclusion(data: dict) -> str:
     if unattr:
         parts.append(
             f"Gaming-related DNS activity was detected ({total_str} queries total), "
-            "however none of the active devices matched the configured CHILD_DEVICES filter. "
+            "however no gaming activity was detected for monitored devices."
             "The activity below is reported across all devices as a fallback. "
-            "Check that CHILD_DEVICES in .env matches the actual device names shown."
+            ""
         )
     elif active == 0:
         # total > 0 but no per-device attribution at all
@@ -482,7 +471,7 @@ def _build_substitutions(data: dict) -> dict:
             '<div class="warn-box">'
             "<strong>Attribution note:</strong> Gaming-related activity was detected but could not be "
             "matched to the configured child device filter. Showing all active devices as fallback. "
-            "Check that CHILD_DEVICES in .env matches actual device names."
+            ""
             "</div>"
         )
     elif active == 0 and total > 0:
@@ -612,7 +601,7 @@ def render_text(data: dict) -> str:
     ]
 
     if data.get("unattributed"):
-        lines.append("  WARNING: No devices matched CHILD_DEVICES filter — showing all devices as fallback.")
+        lines.append("  WARNING: unattributed fallback active.")
         lines.append("")
 
     lines.append("PER DEVICE")
