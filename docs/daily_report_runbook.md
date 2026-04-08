@@ -2,9 +2,9 @@
 
 ## Overview
 
-A daily HTML email report summarising gaming-related DNS activity from the home network, sent automatically via Synology Task Scheduler.
+A daily HTML email report summarising gaming-related DNS activity from the home network, sent automatically at 07:00 NAS local time.
 
-**What it sends:** one email per day to configured recipients.
+**What it sends:** one email per day to configured recipients covering the **previous 24 hours** (rolling window ending at send time).
 **What it is based on:** Loki DNS query log data (same source as the dashboard).
 **What it is not:** a gameplay duration estimate — wording is conservative throughout.
 
@@ -12,7 +12,7 @@ A daily HTML email report summarising gaming-related DNS activity from the home 
 
 ## Prerequisites
 
-1. `.env` configured with SMTP credentials and child device names
+1. `.env` configured with SMTP credentials and exclude list
 2. Loki running and accessible at `LOKI_URL`
 3. Python 3.8+ on the NAS (available by default on Synology)
 
@@ -22,53 +22,50 @@ A daily HTML email report summarising gaming-related DNS activity from the home 
 
 ### 1. Configure `.env`
 
-Copy the relevant section from `.env.example` into your `.env`:
-
 ```bash
 cd /volume1/docker/home-network-monitoring
 cp .env.example .env
-# Then edit .env and fill in:
-#   CHILD_DEVICES=Ethan PC,EthanR-PC
-#   SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
-#   SMTP_FROM, SMTP_TO
-#   REPORT_TIMEZONE
+vi .env
 ```
 
-### 2. Child device names
+Required values:
 
-The `CHILD_DEVICES` variable is a regex pattern matched against the `client_name` field in DNS logs. Use exact names or `|`-separated alternatives:
+```bash
+LOKI_URL=http://192.168.1.5:3100
+REPORT_TIMEZONE=Australia/Sydney
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=you@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=you@gmail.com
+SMTP_TO=parent1@example.com,parent2@example.com
+SMTP_USE_TLS=true
 
+# Optional: override the default exclusion list (Fox Devices + David iPhone)
+# EXCLUDE_DEVICES=192[.]168[.]1[.]1$|192[.]168[.]1[.]18$|...
 ```
-# Single child
-CHILD_DEVICES=Ethan PC
 
-# Multiple children
-CHILD_DEVICES=Ethan PC|EthanR-PC|Elissa
+### 2. Device filtering — exclusion mode
+
+The report monitors **all devices** and excludes those matching `EXCLUDE_DEVICES`.
+
+The default exclusion list covers the **Fox Devices** AdGuard group and David iPhone:
+```
+192.168.1.1/3/5/6/14/16/17/18/101/250/251
 ```
 
-Check exact names in the Grafana dashboard variable dropdown.
+To exclude additional devices, override `EXCLUDE_DEVICES` in `.env` using pipe-separated RE2 patterns. Use `[.]` not `\.` for literal dots.
+
+To find the `client_name` of a device, check the Grafana dashboard **Child Device** variable dropdown.
 
 ### 3. Test the report manually
 
 ```bash
 cd /volume1/docker/home-network-monitoring
-
-# Run once without sending (prints to stdout if SMTP not set)
-python3 scripts/send_daily_report.py
-
-# Or with SMTP configured:
-SMTP_HOST=smtp.example.com \
-SMTP_PORT=587 \
-SMTP_USERNAME=user \
-SMTP_PASSWORD=pass \
-SMTP_FROM=sender@example.com \
-SMTP_TO=parent@example.com \
-SMTP_USE_TLS=true \
-LOKI_URL=http://192.168.1.5:3100 \
-CHILD_DEVICES="Ethan PC|EthanR-PC" \
-REPORT_TIMEZONE=Australia/Sydney \
 python3 scripts/send_daily_report.py
 ```
+
+Leave `SMTP_HOST` empty in `.env` to print the plain-text report to stdout instead of sending.
 
 ### 4. Schedule via /etc/crontab (active on NAS)
 
@@ -78,22 +75,34 @@ The cron entry is already installed in `/etc/crontab` on the NAS:
 0	7	*	*	*	root	cd /volume1/docker/home-network-monitoring && python3 scripts/send_daily_report.py >> /volume1/docker/home-network-monitoring/logs/report.log 2>&1
 ```
 
-This runs every day at **07:00 NAS local time** and writes output to `logs/report.log`.
+Runs every day at **07:00 NAS local time**, covering the previous 24 hours.
 
-To verify it is active:
+To verify:
 ```bash
 grep send_daily /etc/crontab
 ```
 
-To update the time, edit `/etc/crontab` and reload crond:
+To change the time, edit `/etc/crontab` and reload crond:
 ```bash
-# Edit the cron entry
 vi /etc/crontab
-# Reload
 kill -HUP $(ps | grep crond | grep -v grep | awk '{print $1}')
 ```
 
-Log directory was created at `/volume1/docker/home-network-monitoring/logs/`.
+View recent log output:
+```bash
+tail -20 /volume1/docker/home-network-monitoring/logs/report.log
+```
+
+---
+
+## What the report contains
+
+1. **Summary** — device count, total gaming DNS hits, blocked hits, top domains
+2. **Per device** — gaming hits, blocked %, top domains, one-line note
+3. **Recent gaming DNS queries** — up to 15 most recent gaming lookups with ALLOWED/BLOCKED status
+4. **Recent entertainment context** — up to 10 recent YouTube/Discord/Twitch lookups from monitored devices
+5. **Conclusion** — plain-language summary
+6. **Notes** — caveats about DNS evidence vs. proof of play
 
 ---
 
@@ -107,53 +116,26 @@ Log directory was created at `/volume1/docker/home-network-monitoring/logs/`.
 | 3 | Data fetch/query failed |
 | 4 | SMTP send failed |
 
-Task Scheduler should flag any non-zero exit code as a failure.
-
 ---
 
-## What the report contains
+## Troubleshooting
 
-1. **Summary** — device count, total gaming hits, blocked hits, top domains
-2. **Per device** — gaming hits, blocked hits, top domains, entertainment overlap, one-line note
-3. **Recent blocked gaming evidence** — up to 15 most recent blocked gaming DNS lookups
-4. **Recent entertainment context** — up to 10 most recent entertainment DNS lookups from active child devices
-5. **Conclusion** — one-paragraph plain-language summary
-6. **Notes** — caveats about evidence vs. proof
+**"Cannot connect to Loki":** check `LOKI_URL` in `.env` and that Loki is running (`docker compose ps`).
+
+**"SMTP config incomplete":** ensure all SMTP variables are set in `.env`.
+
+**Empty report / no devices shown:** all active devices may be in the exclusion list. Check `EXCLUDE_DEVICES` against actual `client_name` values in Grafana.
+
+**STATUS showing wrong value:** the script detects blocked queries by the `— BLOCKED` marker written by Alloy. If Alloy config changes the output format, update `parse_log_line()` in the script accordingly.
 
 ---
 
 ## Customisation
 
-### Change report time
+### Change domain filters
 
-Edit the Synology Task Scheduler schedule, or set `REPORT_TIMEZONE` to match your local time.
+`GAMING_PATTERNS` and `ENTERTAINMENT_PATTERNS` in `send_daily_report.py` must stay in sync with the dashboard panel queries. Update both together.
 
 ### Change styling
 
-Edit the CSS in `scripts/send_daily_report.py` — the `render_html()` function contains all styles inline.
-
-### Change domain filters
-
-The `GAMING_PATTERNS` and `ENTERTAINMENT_PATTERNS` constants in `send_daily_report.py` must match the current dashboard rules. Update both files together.
-
-### Dry run (no email)
-
-Leave `SMTP_HOST` empty in `.env`. The script prints the plain-text report to stdout.
-
----
-
-## Troubleshooting
-
-**"Cannot connect to Loki":** check `LOKI_URL` in `.env` and that the Loki container is running (`docker compose ps`).
-
-**"SMTP config incomplete":** ensure all five SMTP variables are set in `.env`.
-
-**Empty report but gaming activity exists:** check that `CHILD_DEVICES` matches the exact `client_name` values in Loki.
-
-**Report sent but looks wrong:** run manually with stdout output to see any Python errors.
-
----
-
-## Updating the script
-
-After any change to the dashboard's domain filters, copy the updated patterns into `send_daily_report.py` (the `GAMING_PATTERNS` and `ENTERTAINMENT_PATTERNS` constants).
+All CSS is inline in the `render_html()` function in `send_daily_report.py`.
