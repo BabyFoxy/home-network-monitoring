@@ -72,7 +72,13 @@ SMTP_PASSWORD  = _env("SMTP_PASSWORD", "")
 SMTP_FROM      = _env("SMTP_FROM", "")
 SMTP_TO        = _env("SMTP_TO", "")
 SMTP_USE_TLS   = _env("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
-CHILD_DEVICES  = _env("CHILD_DEVICES", "")   # regex matching client_name labels
+# Fox Devices IPs to exclude (from AdGuard Fox Devices group)
+FOX_DEVICE_IPS = {"192.168.1.1","192.168.1.3","192.168.1.5","192.168.1.6",
+                   "192.168.1.14","192.168.1.16","192.168.1.17","192.168.1.101",
+                   "192.168.1.250","192.168.1.251"}
+CHILD_DEVICES  = _env("CHILD_DEVICES",
+    "Elissa PC|Ethan MBP|Ethan PC|EthanR-PC|MBP-S26226|David iPhone"
+)   # regex matching client_name labels; override in .env
 
 _DEVICE_DISPLAY_RAW = _env("DEVICE_DISPLAY_NAMES", "")
 DEVICE_DISPLAY_NAMES: dict = {}
@@ -258,7 +264,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
     # ── Top domains globally via metric + regexp extraction ──────────────────────
     try:
         dom_result = loki.metric_instant(
-            f'topk(10, sum by (domain) (count_over_time({{job="adguard"}} |~ "{gaming}" | regexp "-> (?P<domain>[^ ]+)" [{dur}])))',
+            f'topk(10, sum by (domain) (count_over_time({{job="adguard"}} |~ "{gaming}" | regexp "(?:->|→) (?P<domain>[^ ]+)" [{dur}])))',
             at_ns=end_ns,
         )
         top_domains = {
@@ -275,7 +281,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
     for dev in device_hits:
         try:
             r2 = loki.metric_instant(
-                f'topk(5, sum by (domain) (count_over_time({{job="adguard", client_name="{dev}"}} |~ "{gaming}" | regexp "-> (?P<domain>[^ ]+)" [{dur}])))',
+                f'topk(5, sum by (domain) (count_over_time({{job="adguard", client_name="{dev}"}} |~ "{gaming}" | regexp "(?:->|→) (?P<domain>[^ ]+)" [{dur}])))',
                 at_ns=end_ns,
             )
             device_domain_counts[dev] = dict(sorted(
@@ -316,7 +322,7 @@ def fetch_report_data(loki: LokiClient) -> dict:
 
     entertainment_domains = set()
     for _, line in entertainment_rows:
-        m = re.search(r"-> ([^ ]+)", line)
+        m = re.search(r"(?:->|→) ([^ ]+)", line)
         if m:
             entertainment_domains.add(m.group(1))
     entertainment_summary = (
@@ -426,7 +432,7 @@ def parse_log_line(line: str) -> dict:
     """Parse a Loki log line: 'Client Name (IP) -> domain.com [TYPE] cat=X reason=N ...'"""
     # Full client name is everything up to the first " ("
     device_m = re.search(r"^(.+?) \(", line)
-    domain_m = re.search(r"-> ([^ ]+)", line)
+    domain_m = re.search(r"(?:->|→) ([^ ]+)", line)
     type_m   = re.search(r"\[([A-Z]+)\]", line)
     reason_m = re.search(r"reason=([0-9]+|<no value>)", line)
 
