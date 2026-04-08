@@ -423,19 +423,15 @@ def parse_log_line(line: str) -> dict:
     device_m = re.search(r"^(.+?) \(", line)
     domain_m = re.search(r"(?:->|→) ([^ ]+)", line)
     type_m   = re.search(r"\[([A-Z]+)\]", line)
-    reason_m = re.search(r"reason=([0-9]+|<no value>)", line)
-
     device = device_m.group(1) if device_m else line.split()[0] if line else "?"
     domain = domain_m.group(1) if domain_m else "?"
     qt     = type_m.group(1)   if type_m   else "?"
-    reason = reason_m.group(1) if reason_m else "0"
-    blocked = reason not in ("<no value>", "0", "1", "2")
+    blocked = "— BLOCKED" in line or "— BLOCKED" in line
 
     return {
         "device":      device,
         "domain":      domain,
         "query_type":  qt,
-        "reason":      reason,
         "blocked":     blocked,
         "status":      "BLOCKED" if blocked else "allowed",
         "status_class": "blocked" if blocked else "allowed",
