@@ -456,7 +456,7 @@
     },
     {
       "id": 6,
-      "title": "Blocked Gaming Evidence  (24h, newest first)",
+      "title": "Gaming DNS Queries  (24h, newest first \u2014 allowed + blocked)",
       "description": "Blocked gaming-related DNS queries in the past 24 hours. Each row = one blocked lookup. Use Domain filter to narrow results.",
       "type": "logs",
       "gridPos": {
@@ -547,7 +547,7 @@
       ],
       "targets": [
         {
-          "expr": "{job=\"adguard\", reason=~\"[3-9]\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\"",
+          "expr": "{job=\"adguard\", client_name=~\"$client_name\"} |~ \"roblox|rbxcdn|rbxusercontent|bloxd[.]io|mojang|minecraft|crazygames|poki[.]com|now[.]gg|itch[.]io|lagged[.]com|gameflare|friv[.]com|y8[.]com|miniclip|kizi[.]com\" |~ \"(?i)${domain_search:raw}\"",
           "queryType": "range",
           "refId": "A",
           "datasource": {
