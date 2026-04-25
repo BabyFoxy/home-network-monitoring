@@ -38,5 +38,5 @@ Work through this list top to bottom. All items must pass before the stack is co
 
 ## Backup
 
-- [ ] `bash scripts/backup-log-viz.sh` runs without error
-- [ ] Backup appears in `/volume1/docker/log-viz/backups/`
+- [ ] The backup helper runs without error
+- [ ] Backup appears in `/volume1/docker/home-network-monitoring/backups/`

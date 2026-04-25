@@ -20,7 +20,7 @@ Self-hosted DNS and network log visualisation on Synology NAS using Docker Compo
 
 ```bash
 # On the Synology NAS (SSH)
-cd /volume1/docker/log-viz
+cd /volume1/docker/home-network-monitoring
 
 # Create .env
 cp .env.example .env
@@ -96,20 +96,16 @@ curl http://127.0.0.1:12345/-/ready || true
 |---|---|
 | `scripts/validate-stack.sh` | Health check all services |
 | `scripts/tail-useful-logs.sh` | Print recent logs from all containers |
-| `scripts/backup-log-viz.sh` | Backup configs and Grafana DB |
+| backup helper | Backup configs and Grafana DB |
 
-```bash
-bash scripts/validate-stack.sh
-bash scripts/tail-useful-logs.sh
-bash scripts/backup-log-viz.sh
-```
+Use the backup helper from `scripts/` alongside the validation and log-tailing scripts.
 
 ---
 
 ## Updating from GitHub
 
 ```bash
-cd /volume1/docker/log-viz
+cd /volume1/docker/home-network-monitoring
 git pull
 docker compose pull
 docker compose up -d
@@ -120,7 +116,7 @@ docker compose up -d
 ## Directory layout
 
 ```
-/volume1/docker/log-viz/
+/volume1/docker/home-network-monitoring/
 ├── docker-compose.yml
 ├── .env                    ← not in git, created from .env.example
 ├── loki/config.yml
@@ -134,6 +130,8 @@ docker compose up -d
 
 ## Further reading
 
+- `docs/README.md` — entry point for the active docs set
+- `docs/history.md` — short changelog of the major milestones in git history
 - `docs/deployment-notes.md` — step-by-step first deployment
 - `docs/validation-checklist.md` — full acceptance checklist
 - `docs/next-steps-udm-parser.md` — how to build a UDM parser after capturing real samples
